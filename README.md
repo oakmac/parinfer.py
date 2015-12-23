@@ -4,7 +4,7 @@ A [Parinfer] implementation written in Python.
 
 ## Status
 
-* [ ] Set up a testing framework with the [Parinfer tests] (see [usage][test-usage])
+* [ ] Set up a testing framework with the [Parinfer test cases] based on the [JS test runner]
 * [ ] Write implementation based off of [parinfer.js]
 
 ## License
@@ -12,7 +12,7 @@ A [Parinfer] implementation written in Python.
 [ISC License]
 
 [Parinfer]:http://shaunlebron.github.io/parinfer/
-[Parinfer tests]:https://github.com/shaunlebron/parinfer/tree/master/lib/test/cases
-[test-usage]:https://github.com/shaunlebron/parinfer/blob/master/lib/test/test.js
+[Parinfer test cases]:https://github.com/shaunlebron/parinfer/tree/master/lib/test/cases
+[JS test runner]:https://github.com/shaunlebron/parinfer/blob/master/lib/test/test.js
 [Parinfer metal]:https://github.com/shaunlebron/parinfer/blob/master/lib/parinfer.js
 [ISC License]:LICENSE.md
