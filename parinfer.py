@@ -40,7 +40,11 @@ def process_text(text, options):
     # return the state
     return state
 
-def format_text(in_text, options):
+def paren_mode(in_text, options):
+    # TODO: write Paren Mode
+    return in_text;
+
+def indent_mode(in_text, options):
     state = process_text(in_text, options)
 
     if state['is_valid'] is True:

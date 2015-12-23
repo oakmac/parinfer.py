@@ -1,8 +1,7 @@
 ## This file runs the tests for Parinfer.
 
 import json
-import parinfer.indent_mode
-import parinfer.paren_mode
+from parinfer import indent_mode, paren_mode
 
 # load test files
 with open('./tests/indent-mode.json') as indent_mode_tests_json:
@@ -16,6 +15,6 @@ for test in INDENT_MODE_TESTS:
     out_text = '\n'.join(test['out']['lines'])
 
     # TODO: need to pass options here
-    result = parinfer.indent_mode.format_text(in_text, {})
+    result = indent_mode(in_text, {})
 
     print out_text == result['text']
