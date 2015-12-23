@@ -14,5 +14,5 @@ A [Parinfer] implementation written in Python.
 [Parinfer]:http://shaunlebron.github.io/parinfer/
 [Parinfer test cases]:https://github.com/shaunlebron/parinfer/tree/master/lib/test/cases
 [JS test runner]:https://github.com/shaunlebron/parinfer/blob/master/lib/test/test.js
-[Parinfer metal]:https://github.com/shaunlebron/parinfer/blob/master/lib/parinfer.js
+[parinfer.js]:https://github.com/shaunlebron/parinfer/blob/master/lib/parinfer.js
 [ISC License]:LICENSE.md
