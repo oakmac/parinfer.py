@@ -15,7 +15,7 @@ def timeProcess(string, options):
   dt = time.clock() - t
   print "Paren Mode:", dt, "s"
 
-with open('tests/really_long_file.clj', 'r') as f:
+with open('tests/really_long_file', 'r') as f:
     text = f.read()
 
 timeProcess(text, {})
