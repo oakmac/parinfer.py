@@ -1,4 +1,6 @@
 ## This file runs the tests for Parinfer.
+## NOTE: this file is pretty quick and dirty
+##       it could use some work to be more robust
 
 import json
 from parinfer import indent_mode, paren_mode

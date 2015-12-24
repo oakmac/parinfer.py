@@ -7,33 +7,25 @@
 ## Released under the ISC License:
 ## https://github.com/oakmac/parinfer.py/blob/master/LICENSE.md
 
+#-------------------------------------------------------------------------------
+# Constants
+#-------------------------------------------------------------------------------
 
+BACKSLASH = '\\'
+COMMA = ','
+DOUBLE_QUOTE = '"'
+NEWLINE = '\n'
+SEMICOLON = ';'
+TAB = '\t'
 
-
-
-
-
-
-
-
-### DEBUG: remove this
-
-import json
-
-def print_r(x):
-    print json.dumps(x, sort_keys=True, indent=2, separators=(',', ': '))
-    print "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
-
-### END DEBUG
-
-
-
-
-
-
-
-
-
+MATCHING_PAREN = {
+    '{': '}',
+    '}': '{',
+    '[': ']',
+    ']': '[',
+    '(': ')',
+    ')': '(',
+}
 
 #-------------------------------------------------------------------------------
 # Result Structure
@@ -75,26 +67,6 @@ def replaceStringRange(orig, start, end, replace):
 
 def removeStringRange(orig, start, end):
     return orig[:start] + orig[end:]
-
-#-------------------------------------------------------------------------------
-# Constants
-#-------------------------------------------------------------------------------
-
-BACKSLASH = '\\'
-COMMA = ','
-DOUBLE_QUOTE = '"'
-NEWLINE = '\n'
-SEMICOLON = ';'
-TAB = '\t'
-
-MATCHING_PAREN = {
-    '{': '}',
-    '}': '{',
-    '[': ']',
-    ']': '[',
-    '(': ')',
-    ')': '(',
-}
 
 #-------------------------------------------------------------------------------
 # Reader Operations

@@ -1,18 +1,33 @@
-# Parinfer for Python [WORK IN PROGRESS]
+# Parinfer for Python
 
 A [Parinfer] implementation written in Python.
 
-## Status
+## About
 
-* [ ] Set up a testing framework with the [Parinfer test cases] based on the [JS test runner]
-* [ ] Write implementation based off of [parinfer.js]
+There are several text editors where Python is the best - or only - choice for
+extensions. Having a Parinfer implementation in Python allows Parinfer to reach
+more editors.
+
+This is basically a 1-to-1 copy of [parinfer.js].
+
+The `.json` files in the [tests] folder are copied directly from the [main
+Parinfer repo].
+
+I am a very novice Python developer. There is likely lots of room for
+improvement in this implementation. PR's welcome :)
+
+## Run Tests
+
+```sh
+python tests.py
+```
 
 ## License
 
 [ISC License]
 
 [Parinfer]:http://shaunlebron.github.io/parinfer/
-[Parinfer test cases]:https://github.com/shaunlebron/parinfer/tree/master/lib/test/cases
-[JS test runner]:https://github.com/shaunlebron/parinfer/blob/master/lib/test/test.js
 [parinfer.js]:https://github.com/shaunlebron/parinfer/blob/master/lib/parinfer.js
+[tests]:tests/
+[Parinfer repo]:https://github.com/shaunlebron/parinfer/tree/master/lib/test/cases
 [ISC License]:LICENSE.md
