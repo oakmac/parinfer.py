@@ -458,9 +458,11 @@ def finalizeResult(result):
 def processText(text, options):
     result = initialResult()
 
-    if options:
-        result['cursorX'] = options['cursorX']
-        result['cursorLine'] = options['cursorLine']
+    if isinstance(options, dict):
+        if 'cursorLine' in options:
+            result['cursorLine'] = options['cursorLine']
+        if 'cursorX' in options:
+            result['cursorX'] = options['cursorX']
 
     lines = text.split(NEWLINE)
     for line in lines:
@@ -496,7 +498,7 @@ def appendParenTrail(result):
     result['insert']['x'] = result['insert']['x'] + 1
 
 def minIndent(x, result):
-    opener = peek(result['stack'])
+    opener = peek(result['stack'], None)
     if opener != None:
         startX = opener['x']
         return max(startX + 1, x)
@@ -508,7 +510,7 @@ def minDedent(x, result):
     return x
 
 def correctIndent(result):
-    opener = peek(result['stack'])
+    opener = peek(result['stack'], None)
     delta = 0
     if opener != None and opener['indentDelta'] != None:
         delta = opener['indentDelta']
@@ -535,7 +537,7 @@ def handleCursorDelta(result):
     hasCursorDelta = bool(result['cursorLine'] == result['lineNo'] and
                           result['cursorX'] == result['x'] and
                           result['cursorX'] != None)
-    if hasCursorDelta:
+    if hasCursorDelta and result['cursorDx'] != None:
         result['indentDelta'] = result['indentDelta'] + result['cursorDx']
 
 def processIndent_paren(result):
@@ -642,10 +644,13 @@ def finalizeResult_paren(result):
 def processText_paren(text, options):
     result = initialResult()
 
-    if options:
-        result['cursorDx'] = options['cursorDx']
-        result['cursorLine'] = options['cursorLine']
-        result['cursorX'] = options['cursorX']
+    if isinstance(options, dict):
+        if 'cursorDx' in options:
+            result['cursorDx'] = options['cursorDx']
+        if 'cursorLine' in options:
+            result['cursorLine'] = options['cursorLine']
+        if 'cursorX' in options:
+            result['cursorX'] = options['cursorX']
 
     lines = text.split(NEWLINE)
     for line in lines:
@@ -665,7 +670,7 @@ def formatText_paren(text, options):
         'text': outText,
         'success': result['success'],
     }
-    
+
 #-------------------------------------------------------------------------------
 # Public API
 #-------------------------------------------------------------------------------

@@ -15,11 +15,14 @@ def run_test(test, parinfer_fn):
     out_text = '\n'.join(test['out']['lines'])
 
     options = None
-    if test['in']['cursor']:
-        options = {
-            'cursorX': test['in']['cursor']['cursor-x'],
-            'cursorLine': test['in']['cursor']['cursor-line'],
-        }
+    if isinstance(test['in']['cursor'], dict):
+        options = {}
+        if 'cursor-dx' in test['in']['cursor']:
+            options['cursorDx'] = test['in']['cursor']['cursor-dx']
+        if 'cursor-line' in test['in']['cursor']:
+            options['cursorLine'] = test['in']['cursor']['cursor-line']
+        if 'cursor-x' in test['in']['cursor']:
+            options['cursorX'] = test['in']['cursor']['cursor-x']
 
     result = parinfer_fn(in_text, options)
 
