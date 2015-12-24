@@ -535,30 +535,137 @@ def handleCursorDelta(result):
     hasCursorDelta = bool(result['cursorLine'] == result['lineNo'] and
                           result['cursorX'] == result['x'] and
                           result['cursorX'] != None)
-   if hasCursorDelta:
-       result['indentDelta'] = result['indentDelta'] + result['cursorDx']
+    if hasCursorDelta:
+        result['indentDelta'] = result['indentDelta'] + result['cursorDx']
 
 def processIndent_paren(result):
-    return None
+    ch = result['ch']
+    stack = result['stack']
+
+    checkIndent = bool(result['trackIndent'] and
+                       isInCode(stack) and
+                       isWhitespace(ch) != True and
+                       result['ch'] != SEMICOLON)
+
+    atValidCloser = bool(checkIndent and
+                         isCloseParen(ch) and
+                         isValidCloser(stack, ch))
+
+    isCursorHolding = bool(result['lineNo'] == result['cursorLine'] and
+                           result['cursorX'] != None and
+                           result['cursorX'] <= result['x'])
+
+    shouldMoveCloser = bool(atValidCloser and isCursorHolding != True)
+    skip = bool(checkIndent and isCloseParen(ch) and isCursorHolding != True)
+    atIndent = bool(checkIndent and skip != True)
+    quit = bool(atIndent and result['quoteDanger'])
+
+    result['quit'] = quit
+    result['process'] = bool(skip != True)
+
+    if quit:
+        return
+
+    if shouldMoveCloser:
+        appendParenTrail(result)
+
+    handleCursorDelta(result)
+
+    if atIndent:
+        correctIndent(result)
 
 def processChar_paren(result, ch):
-    return None
+    origCh = ch
+    result['ch'] = ch
+    processIndent_paren(result)
+
+    if result['quit']:
+        return
+
+    if result['process']:
+        # NOTE: the order here is important!
+        updateParenTrail(result)
+        pushChar(result)
+        updateInsertionPt(result)
+    else:
+        result['ch'] = ""
+
+    updateLine(result, origCh)
+    result['x'] = result['x'] + len(result['ch'])
 
 def formatParenTrail(result):
-    return None
+    start = result['parenTrail']['start']
+    end = result['parenTrail']['end']
+
+    if start == None or end == None:
+        return
+
+    line = result['lines'][result['lineNo']]
+    newTrail = ""
+    spaceCount = 0
+    for i in range(start, end):
+        if isCloseParen(line[i]):
+            newTrail = newTrail + line[i]
+        else:
+            spaceCount = spaceCount + 1
+
+    if spaceCount > 0:
+        result['lines'][result['lineNo']] = replaceString(line, start, end, newTrail)
+        end = end - spaceCount
+
+    if result['insert']['lineNo'] == result['lineNo']:
+        result['insert']['x'] = end
 
 def processLine_paren(result, line):
-    return None
+    result['lineNo'] = result['lineNo'] + 1
+    result['backup'] = []
+    result['cursorInComment'] = False
+    result['parenTrail'] = {'start': None, 'end': None}
+    result['trackIndent'] = bool(isInStr(result['stack']) != True)
+    result['lines'].append(line)
+    result['x'] = 0
+    result['indentDelta'] = 0
+
+    chars = line + NEWLINE
+    for ch in chars:
+        processChar_paren(result, ch)
+        if result['quit']:
+            break
+
+    if result['quit'] != True:
+        formatParenTrail(result)
 
 def finalizeResult_paren(result):
-    return None
+    result['success'] = bool(len(result['stack']) == 0 and
+                             result['quoteDanger'] != True)
 
 def processText_paren(text, options):
-    return None
+    result = initialResult()
+
+    if options:
+        result['cursorDx'] = options['cursorDx']
+        result['cursorLine'] = options['cursorLine']
+        result['cursorX'] = options['cursorX']
+
+    lines = text.split(NEWLINE)
+    for line in lines:
+        processLine_paren(result, line)
+        if result['quit']:
+            break
+
+    finalizeResult_paren(result)
+    return result
 
 def formatText_paren(text, options):
-    return None
-
+    result = processText_paren(text, options)
+    outText = text
+    if result['success']:
+        outText = NEWLINE.join(result['lines'])
+    return {
+        'text': outText,
+        'success': result['success'],
+    }
+    
 #-------------------------------------------------------------------------------
 # Public API
 #-------------------------------------------------------------------------------
