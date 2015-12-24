@@ -1,0 +1,16 @@
+# This file is for unifying the coding style for different editors and IDEs.
+# More information at http://EditorConfig.org
+
+# Do not check for any .editorconfig files above this directory
+root = true
+
+# Unix-style newlines with a newline ending every file
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+
+# 4 space indentation
+[*.py]
+indent_style = space
+indent_size = 4

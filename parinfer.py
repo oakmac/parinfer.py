@@ -297,9 +297,9 @@ def updateParenTrail(result):
                        (isEscaping(stack) or shouldPass != True))
 
     result['cursorInComment'] = bool(result['cursorInComment'] or
-                                       (result['cursorLine'] == result['lineNo'] and
-                                        result['x'] == result['cursorX'] and
-                                        isInComment(stack)))
+                                     (result['cursorLine'] == result['lineNo'] and
+                                      result['x'] == result['cursorX'] and
+                                      isInComment(stack)))
 
     shouldUpdate = bool(isInCode(stack) and
                         isEscaping(stack) != True and
