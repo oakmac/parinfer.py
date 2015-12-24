@@ -16,6 +16,7 @@
 
 
 
+### DEBUG: remove this
 
 import json
 
@@ -23,11 +24,7 @@ def print_r(x):
     print json.dumps(x, sort_keys=True, indent=2, separators=(',', ': '))
     print "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
 
-
-
-
-
-
+### END DEBUG
 
 
 
@@ -83,10 +80,12 @@ def removeStringRange(orig, start, end):
 # Constants
 #-------------------------------------------------------------------------------
 
-BACK_SLASH = '\\'
+BACKSLASH = '\\'
 COMMA = ','
 DOUBLE_QUOTE = '"'
+NEWLINE = '\n'
 SEMICOLON = ';'
+TAB = '\t'
 
 MATCHING_PAREN = {
     '{': '}',
@@ -108,7 +107,7 @@ def isCloseParen(c):
     return c == "}" or c == ")" or c == "]"
 
 def isWhitespace(c):
-    return c == " " or c == "\t" or c== "\n"
+    return c == " " or c == TAB or c== NEWLINE
 
 #-------------------------------------------------------------------------------
 # Stack States
@@ -130,7 +129,7 @@ def getPrevCh(stack, i):
         return e['ch']
 
 def isEscaping(stack):
-    return getPrevCh(stack, None) == BACK_SLASH
+    return getPrevCh(stack, None) == BACKSLASH
 
 def prevNonEscCh(stack):
     i = 1
@@ -243,16 +242,16 @@ def pushChar(result):
     if isCloseParen(ch) == True:
         pushClose(result)
         return
-    if ch == '\t':
+    if ch == TAB:
         pushTab(result)
         return
     if ch == SEMICOLON:
         pushSemicolon(result)
         return
-    if ch == "\n":
+    if ch == NEWLINE:
         pushNewline(result)
         return
-    if ch == "\\":
+    if ch == BACKSLASH:
         pushEscape(result)
         return
     if ch == DOUBLE_QUOTE:
@@ -372,7 +371,7 @@ def updateInsertionPt(result):
 
     shouldInsert = bool(isInCode(result['stack']) and
                         ch != "" and
-                        (isWhitespace(ch) != True or prevCh == "\\") and
+                        (isWhitespace(ch) != True or prevCh == BACKSLASH) and
                         (isCloseParen(ch) != True or result['lineNo'] == result['cursorLine']))
 
     if shouldInsert:
@@ -391,7 +390,7 @@ def processIndent(result):
     checkIndent = bool(result['trackIndent'] and
                        isInCode(stack) and
                        isWhitespace(ch) != True and
-                       ch != ";")
+                       ch != SEMICOLON)
     skip = bool(checkIndent and isCloseParen(ch))
     atIndent = bool(checkIndent and skip != True)
     quit = bool(atIndent and result['quoteDanger'])
@@ -439,7 +438,7 @@ def processLine(result, line):
     result['lines'].append(line)
     result['x'] = 0
 
-    chars = line + "\n"
+    chars = line + NEWLINE
     for ch in chars:
         processChar(result, ch)
         if result['quit']:
@@ -463,7 +462,7 @@ def processText(text, options):
         result['cursorX'] = options['cursorX']
         result['cursorLine'] = options['cursorLine']
 
-    lines = text.split("\n")
+    lines = text.split(NEWLINE)
     for line in lines:
         processLine(result, line)
         if result['quit']:
@@ -476,7 +475,7 @@ def formatText(text, options):
     result = processText(text, options)
     outText = text
     if result['success']:
-        outText = '\n'.join(result['lines'])
+        outText = NEWLINE.join(result['lines'])
     return {
         'text': outText,
         'success': result['success'],

@@ -14,12 +14,16 @@ def run_indent_mode_test(test):
     in_text = '\n'.join(test['in']['lines'])
     out_text = '\n'.join(test['out']['lines'])
 
-    # TODO: need to pass options here
-    result = indent_mode(in_text, None)
+    options = None
+    if test['in']['cursor']:
+        options = {
+            'cursorX': test['in']['cursor']['cursor-x'],
+            'cursorLine': test['in']['cursor']['cursor-line'],
+        }
 
-    if result['success'] != True:
-        print "Test " + str(test_id) + " FAILED (parinfer failure)"
-    elif result['success'] == True and result['text'] == out_text:
+    result = indent_mode(in_text, options)
+
+    if result['text'] == out_text:
         print "Test " + str(test_id) + " was a success."
     else:
         print "Test " + str(test_id) + " FAILED (out text did not match)"
@@ -27,5 +31,3 @@ def run_indent_mode_test(test):
 print "Running Indent Mode tests..."
 for test in INDENT_MODE_TESTS:
     run_indent_mode_test(test)
-
-#run_indent_mode_test(INDENT_MODE_TESTS[7])
