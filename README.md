@@ -19,6 +19,7 @@ improvement in this implementation. PR's welcome :)
 ## Run Tests
 
 ```sh
+sudo pip install unittest2
 python tests.py
 ```
 

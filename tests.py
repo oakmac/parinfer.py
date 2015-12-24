@@ -3,6 +3,7 @@
 ##       it could use some work to be more robust
 
 import json
+import unittest2
 from parinfer import indent_mode, paren_mode
 
 # load test files
@@ -11,32 +12,45 @@ with open('./tests/indent-mode.json') as indent_mode_tests_json:
 with open('./tests/paren-mode.json') as paren_mode_tests_json:
     PAREN_MODE_TESTS = json.load(paren_mode_tests_json)
 
-def run_test(test, parinfer_fn):
-    test_id = test['in']['file-line-no']
-    in_text = '\n'.join(test['in']['lines'])
-    out_text = '\n'.join(test['out']['lines'])
+modeFn = {
+  'indent': indent_mode,
+  'paren': paren_mode
+}
 
-    options = None
-    if isinstance(test['in']['cursor'], dict):
-        options = {}
-        if 'cursor-dx' in test['in']['cursor']:
-            options['cursorDx'] = test['in']['cursor']['cursor-dx']
-        if 'cursor-line' in test['in']['cursor']:
-            options['cursorLine'] = test['in']['cursor']['cursor-line']
-        if 'cursor-x' in test['in']['cursor']:
-            options['cursorX'] = test['in']['cursor']['cursor-x']
+oppositeModeFn = {
+  'indent': paren_mode,
+  'paren': indent_mode
+}
 
-    result = parinfer_fn(in_text, options)
+class TestParinfer(unittest2.TestCase):
 
-    if result['text'] == out_text:
-        print "Test " + str(test_id) + " passed."
-    else:
-        print "Test " + str(test_id) + " FAILED (out text did not match)"
+    def run_test(self, test, mode):
+        test_id = test['in']['fileLineNo']
+        in_text = '\n'.join(test['in']['lines'])
+        expected_text = '\n'.join(test['out']['lines'])
 
-print "Running Indent Mode tests..."
-for test in INDENT_MODE_TESTS:
-    run_test(test, indent_mode)
+        options = None
+        if isinstance(test['in']['cursor'], dict):
+            options = test['in']['cursor']
 
-print "Running Paren Mode tests..."
-for test in PAREN_MODE_TESTS:
-    run_test(test, paren_mode)
+        with self.subTest(test_id):
+            out_text = modeFn[mode](in_text, options)['text']
+            self.assertEqual(out_text, expected_text)
+
+            out_text2 = modeFn[mode](out_text, options)['text']
+            self.assertEqual(out_text2, expected_text, "idempotence")
+
+            if options is None:
+                out_text3 = oppositeModeFn[mode](out_text, options)['text']
+                self.assertEqual(out_text3, expected_text, "cross-mode preservation")
+
+    def test_indent_mode(self):
+        for test in INDENT_MODE_TESTS:
+            self.run_test(test, "indent")
+
+    def test_paren_mode(self):
+        for test in PAREN_MODE_TESTS:
+            self.run_test(test, "paren")
+
+if __name__ == "__main__":
+    unittest2.main()
