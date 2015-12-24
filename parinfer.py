@@ -219,71 +219,189 @@ def pushChar(result):
 # Indent Mode Operations
 #-------------------------------------------------------------------------------
 
+def closeParens(result, indentX):
+    if indentX == None:
+        indentX = 0
 
+    stack = result['stack']
+    parens = ""
 
+    while len(stack) > 0:
+        opener = peek(stack)
+        if opener['x'] >= indentX:
+            stack.pop()
+            parens = parens + MATCHING_PAREN[opener['ch']]
+        else:
+            break
 
+    insertLineNo = result['insert']['lineNo']
+    newString = insertString(result['lines'][insertLineNo],
+                             result['insert']['x'],
+                             parens)
+    result['lines'][insertLineNo] = newString
 
+def updateParenTrail(result):
+    ch = result['ch']
+    shouldPass = bool(ch == ';' or
+                      ch == ',' or
+                      isWhitespace(ch) or
+                      isCloseParen(ch))
 
+    stack = result['stack']
+    shouldReset = bool(isInCode(stack) and
+                       (isEscaping(stack) or shouldPass != True))
 
+    result['isCursorInComment'] = bool(result['isCursorInComment'] or
+                                       (result['cursorLine'] == result['lineNo'] and
+                                        result['x'] == result['cursorX'] and
+                                        isInComment(stack)))
 
+    shouldUpdate = bool(isInCode(stack) and
+                        isEscaping(stack) != True and
+                        isCloseParen(ch) and
+                        isValidCloser(stack, ch))
 
+    if shouldReset:
+        result['backup'] = []
+        result['parenTrail'] = {}
+        result['maxIndent'] = None
+    elif shouldUpdate:
+        if result['parenTrail']['start'] == None:
+            result['parenTrail']['start'] = result['x']
+        result['parenTrail']['end'] = result['x'] + 1
 
+def blockParenTrail(result):
+    start = result['parenTrail']['start']
+    end = result['parenTrail']['end']
+    isCursorBlocking = bool(result['lineNo'] == result['cursorLine'] and
+                            start != None and
+                            result['cursorX'] > start and
+                            result['isCursorInComment'] != True)
 
+    if start != None and isCursorBlocking:
+        start = max(start, result['cursorX'])
 
+    if end != None and isCursorBlocking:
+        end = max(end, result['cursorX'])
 
+    if start == end:
+        start = None
+        end = None
 
+    result['parenTrail']['start'] = start
+    result['parenTrail']['end'] = end
 
+def removeParenTrail(result):
+    start = result['parenTrail']['start']
+    end = result['parenTrail']['end']
 
+    if start == None or end == None:
+        return
 
+    stack = result['stack']
+    backup = result['backup']
 
+    line = result['lines'][result['lineNo']]
+    removeCount = 0
+    for i in range(start, end):
+        if isCloseParen(line[i]):
+            removeCount = removeCount + 1
 
+    ignoreCount = backup['length'] - removeCount
+    while ignoreCount != len(backup['length']):
+        stack.append(backup.pop())
 
+    result['lines'][result['lineNo']] = removeStringRange(line, start, end)
 
+    if result['insert']['lineNo'] == result['lineNo']:
+        result['insert']['x'] = min(result['insert']['x'], start)
 
+def updateInsertionPt(result):
+    line = result['lines'][result['lineNo']]
+    prevCh = line[result['x'] - 1]
+    ch = result['ch']
 
+    shouldInsert = bool(isInCode(result.stack) and
+                        ch != "" and
+                        (isWhitespace(ch) != True or prevCh == "\\") and
+                        (isCloseParen(ch) != True or result['lineNo'] == result['cursorLine']))
+
+    if shouldInsert:
+        result['insert'] = {
+            'lineNo': result['lineNo'],
+            'x': result['x'] + 1,
+        }
+
+def processIndentTrigger(result):
+    return None
+
+def processIndent(result):
+    return None
+
+def updateLine(result, origCh):
+    return None
+
+def processChar(result, ch):
+    return None
+
+def processLine(result, line):
+    return None
+
+def finalizeResult(result):
+    return None
+
+def processText(text, options):
+    return None
+
+def formatText(text, options):
+    return None
 
 #-------------------------------------------------------------------------------
-# XYZ
+# Paren Mode Operations
 #-------------------------------------------------------------------------------
 
-def finalize_state(state):
-    # TODO: write me
-    return state
+# def finalize_state(state):
+#     # TODO: write me
+#     return state
+#
+# def process_line(state, line):
+#
+#     return state
+#
+# def process_text(text, options):
+#     state = initial_state()
+#
+#     if options:
+#         state['cursor_x'] = options['cursor_x']
+#         state['cursor_line'] = options['cursor_line']
+#
+#     lines = text.split('\n')
+#     for line in lines:
+#         process_line()
+#
+#     # finalize the result
+#     state = finalize_state(state)
+#
+#     # return the state
+#     return state
 
-def process_line(state, line):
+#-------------------------------------------------------------------------------
+# Public API
+#-------------------------------------------------------------------------------
 
-    return state
-
-def process_text(text, options):
-    state = initial_state()
-
-    if options:
-        state['cursor_x'] = options['cursor_x']
-        state['cursor_line'] = options['cursor_line']
-
-    lines = text.split('\n')
-    for line in lines:
-        process_line()
-
-    # finalize the result
-    state = finalize_state(state)
-
-    # return the state
-    return state
-
-def paren_mode(in_text, options):
-    # TODO: write Paren Mode
-    return in_text;
-
-def indent_mode(in_text, options):
-    state = process_text(in_text, options)
-
-    if state['is_valid'] is True:
-        out_text = '\n'.join(state['lines'])
-    else:
-        out_text = in_text
-
-    return {
-        'valid': True,
-        'text': out_text,
-    }
+# def indent_mode(in_text, options):
+#     state = process_text(in_text, options)
+#
+#     if state['is_valid'] is True:
+#         out_text = '\n'.join(state['lines'])
+#     else:
+#         out_text = in_text
+#
+#     return {
+#         'valid': True,
+#         'text': out_text,
+#     }
+#
+# def paren_mode(in_text, options):
+#     # TODO: write Paren Mode
+#     return in_text;
