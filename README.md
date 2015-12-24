@@ -29,5 +29,5 @@ python tests.py
 [Parinfer]:http://shaunlebron.github.io/parinfer/
 [parinfer.js]:https://github.com/shaunlebron/parinfer/blob/master/lib/parinfer.js
 [tests]:tests/
-[Parinfer repo]:https://github.com/shaunlebron/parinfer/tree/master/lib/test/cases
+[main Parinfer repo]:https://github.com/shaunlebron/parinfer/tree/master/lib/test/cases
 [ISC License]:LICENSE.md
