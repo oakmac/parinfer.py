@@ -7,6 +7,37 @@
 ## Released under the ISC License:
 ## https://github.com/oakmac/parinfer.py/blob/master/LICENSE.md
 
+
+
+
+
+
+
+
+
+
+
+import json
+
+def print_r(x):
+    print json.dumps(x, sort_keys=True, indent=2, separators=(',', ': '))
+    print "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 #-------------------------------------------------------------------------------
 # Result Structure
 #-------------------------------------------------------------------------------
@@ -49,8 +80,13 @@ def removeStringRange(orig, start, end):
     return orig[:start] + orig[end:]
 
 #-------------------------------------------------------------------------------
-# Reader Operations
+# Constants
 #-------------------------------------------------------------------------------
+
+BACK_SLASH = '\\'
+COMMA = ','
+DOUBLE_QUOTE = '"'
+SEMICOLON = ';'
 
 MATCHING_PAREN = {
     '{': '}',
@@ -60,6 +96,10 @@ MATCHING_PAREN = {
     '(': ')',
     ')': '(',
 }
+
+#-------------------------------------------------------------------------------
+# Reader Operations
+#-------------------------------------------------------------------------------
 
 def isOpenParen(c):
     return c == "{" or c == "(" or c == "["
@@ -77,14 +117,20 @@ def isWhitespace(c):
 def peek(stack, i):
     if i is None:
         i = 1
-    return stack[len(stack) - i]
+    try:
+        return stack[len(stack) - i]
+    except IndexError:
+        return None
 
 def getPrevCh(stack, i):
     e = peek(stack, i)
-    return e and e['ch']
+    if e == None:
+        return None
+    else:
+        return e['ch']
 
 def isEscaping(stack):
-    return getPrevCh(stack) == '\\'
+    return getPrevCh(stack, None) == BACK_SLASH
 
 def prevNonEscCh(stack):
     i = 1
@@ -93,16 +139,16 @@ def prevNonEscCh(stack):
     return getPrevCh(stack, i)
 
 def isInStr(stack):
-    return prevNonEscCh(stack) == '"'
+    return prevNonEscCh(stack) == DOUBLE_QUOTE
 
 def isInComment(stack):
-    return prevNonEscCh(stack) == ';'
+    return prevNonEscCh(stack) == SEMICOLON
 
 def isInCode(stack):
     return isInStr(stack) != True and isInComment(stack) != True
 
 def isValidCloser(stack, ch):
-    return getPrevCh(stack) == MATCHING_PAREN[ch]
+    return getPrevCh(stack, None) == MATCHING_PAREN[ch]
 
 #-------------------------------------------------------------------------------
 # Stack Operations
@@ -200,7 +246,7 @@ def pushChar(result):
     if ch == '\t':
         pushTab(result)
         return
-    if ch == ';':
+    if ch == SEMICOLON:
         pushSemicolon(result)
         return
     if ch == "\n":
@@ -209,7 +255,7 @@ def pushChar(result):
     if ch == "\\":
         pushEscape(result)
         return
-    if ch == '"':
+    if ch == DOUBLE_QUOTE:
         pushQuote(result)
         return
     # default case
@@ -227,7 +273,7 @@ def closeParens(result, indentX):
     parens = ""
 
     while len(stack) > 0:
-        opener = peek(stack)
+        opener = peek(stack, None)
         if opener['x'] >= indentX:
             stack.pop()
             parens = parens + MATCHING_PAREN[opener['ch']]
@@ -242,8 +288,8 @@ def closeParens(result, indentX):
 
 def updateParenTrail(result):
     ch = result['ch']
-    shouldPass = bool(ch == ';' or
-                      ch == ',' or
+    shouldPass = bool(ch == SEMICOLON or
+                      ch == COMMA or
                       isWhitespace(ch) or
                       isCloseParen(ch))
 
@@ -251,7 +297,7 @@ def updateParenTrail(result):
     shouldReset = bool(isInCode(stack) and
                        (isEscaping(stack) or shouldPass != True))
 
-    result['isCursorInComment'] = bool(result['isCursorInComment'] or
+    result['cursorInComment'] = bool(result['cursorInComment'] or
                                        (result['cursorLine'] == result['lineNo'] and
                                         result['x'] == result['cursorX'] and
                                         isInComment(stack)))
@@ -263,7 +309,7 @@ def updateParenTrail(result):
 
     if shouldReset:
         result['backup'] = []
-        result['parenTrail'] = {}
+        result['parenTrail'] = {'start': None, 'end': None}
         result['maxIndent'] = None
     elif shouldUpdate:
         if result['parenTrail']['start'] == None:
@@ -276,7 +322,7 @@ def blockParenTrail(result):
     isCursorBlocking = bool(result['lineNo'] == result['cursorLine'] and
                             start != None and
                             result['cursorX'] > start and
-                            result['isCursorInComment'] != True)
+                            result['cursorInComment'] != True)
 
     if start != None and isCursorBlocking:
         start = max(start, result['cursorX'])
@@ -307,8 +353,8 @@ def removeParenTrail(result):
         if isCloseParen(line[i]):
             removeCount = removeCount + 1
 
-    ignoreCount = backup['length'] - removeCount
-    while ignoreCount != len(backup['length']):
+    ignoreCount = len(backup) - removeCount
+    while ignoreCount != len(backup):
         stack.append(backup.pop())
 
     result['lines'][result['lineNo']] = removeStringRange(line, start, end)
@@ -318,10 +364,13 @@ def removeParenTrail(result):
 
 def updateInsertionPt(result):
     line = result['lines'][result['lineNo']]
-    prevCh = line[result['x'] - 1]
+    try:
+        prevCh = line[result['x'] - 1]
+    except IndexError:
+        prevCh = None
     ch = result['ch']
 
-    shouldInsert = bool(isInCode(result.stack) and
+    shouldInsert = bool(isInCode(result['stack']) and
                         ch != "" and
                         (isWhitespace(ch) != True or prevCh == "\\") and
                         (isCloseParen(ch) != True or result['lineNo'] == result['cursorLine']))
@@ -347,7 +396,7 @@ def processIndent(result):
     atIndent = bool(checkIndent and skip != True)
     quit = bool(atIndent and result['quoteDanger'])
 
-    result['quite'] = quit
+    result['quit'] = quit
     result['process'] = bool(skip != True and quit != True)
 
     if atIndent and quit != True:
@@ -402,9 +451,10 @@ def processLine(result, line):
 
 def finalizeResult(result):
     stack = result['stack']
-    result['success'] = bool(isInStr(stack) != True and result['quoteDanger'] != True)
+    result['success'] = bool(isInStr(stack) != True and
+                             result['quoteDanger'] != True)
     if result['success'] and len(stack) > 0:
-        closeParens(result)
+        closeParens(result, None)
 
 def processText(text, options):
     result = initialResult()
@@ -444,3 +494,6 @@ def formatText(text, options):
 
 def indent_mode(in_text, options):
     return formatText(in_text, options)
+
+def paren_mode(in_text, options):
+    return None
