@@ -29,7 +29,7 @@ def run_test(test, parinfer_fn):
     result = parinfer_fn(in_text, options)
 
     if result['text'] == out_text:
-        print "Test " + str(test_id) + " was a success."
+        print "Test " + str(test_id) + " passed."
     else:
         print "Test " + str(test_id) + " FAILED (out text did not match)"
 
