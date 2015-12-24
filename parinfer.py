@@ -586,7 +586,7 @@ def formatParenTrail(result):
             spaceCount = spaceCount + 1
 
     if spaceCount > 0:
-        result['lines'][result['lineNo']] = replaceString(line, start, end, newTrail)
+        result['lines'][result['lineNo']] = replaceStringRange(line, start, end, newTrail)
         end = end - spaceCount
 
     if result['insert']['lineNo'] == result['lineNo']:
