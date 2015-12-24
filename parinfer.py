@@ -483,9 +483,81 @@ def formatText(text, options):
 
 #-------------------------------------------------------------------------------
 # Paren Mode Operations
+# NOTE: Paren Mode re-uses some Indent Mode functions
 #-------------------------------------------------------------------------------
 
-## TODO: write me
+def appendParenTrail(result):
+    opener = result['stack'].pop()
+    closeCh = MATCHING_PAREN[opener['ch']]
+    result['maxIndent'] = opener['x']
+    idx = result['insert']['lineNo']
+    line = result['lines'][idx]
+    result['lines'][idx] = insertString(line, result['insert']['x'], closeCh)
+    result['insert']['x'] = result['insert']['x'] + 1
+
+def minIndent(x, result):
+    opener = peek(result['stack'])
+    if opener != None:
+        startX = opener['x']
+        return max(startX + 1, x)
+    return x
+
+def minDedent(x, result):
+    if result['maxIndent'] != None:
+        return min(result['maxIndent'], x)
+    return x
+
+def correctIndent(result):
+    opener = peek(result['stack'])
+    delta = 0
+    if opener != None and opener['indentDelta'] != None:
+        delta = opener['indentDelta']
+
+    newX = result['x'] + delta
+    newX = minIndent(newX, result)
+    newX = minDedent(newX, result)
+
+    result['indentDelta'] = result['indentDelta'] + newX - result['x']
+
+    if newX != result['x']:
+        indentStr = ""
+        for i in range(0, newX):
+            indentStr = indentStr + " "
+        line = result['lines'][result['lineNo']]
+        newLine = replaceStringRange(line, 0, result['x'], indentStr)
+        result['lines'][result['lineNo']] = newLine
+        result['x'] = newX
+
+    result['trackIndent'] = False
+    result['maxIndent'] = None
+
+def handleCursorDelta(result):
+    hasCursorDelta = bool(result['cursorLine'] == result['lineNo'] and
+                          result['cursorX'] == result['x'] and
+                          result['cursorX'] != None)
+   if hasCursorDelta:
+       result['indentDelta'] = result['indentDelta'] + result['cursorDx']
+
+def processIndent_paren(result):
+    return None
+
+def processChar_paren(result, ch):
+    return None
+
+def formatParenTrail(result):
+    return None
+
+def processLine_paren(result, line):
+    return None
+
+def finalizeResult_paren(result):
+    return None
+
+def processText_paren(text, options):
+    return None
+
+def formatText_paren(text, options):
+    return None
 
 #-------------------------------------------------------------------------------
 # Public API
@@ -495,4 +567,4 @@ def indent_mode(in_text, options):
     return formatText(in_text, options)
 
 def paren_mode(in_text, options):
-    return None
+    return formatText_paren(in_text, options)

@@ -9,7 +9,7 @@ with open('./tests/indent-mode.json') as indent_mode_tests_json:
 with open('./tests/paren-mode.json') as paren_mode_tests_json:
     PAREN_MODE_TESTS = json.load(paren_mode_tests_json)
 
-def run_indent_mode_test(test):
+def run_test(test, parinfer_fn):
     test_id = test['in']['file-line-no']
     in_text = '\n'.join(test['in']['lines'])
     out_text = '\n'.join(test['out']['lines'])
@@ -21,7 +21,7 @@ def run_indent_mode_test(test):
             'cursorLine': test['in']['cursor']['cursor-line'],
         }
 
-    result = indent_mode(in_text, options)
+    result = parinfer_fn(in_text, options)
 
     if result['text'] == out_text:
         print "Test " + str(test_id) + " was a success."
@@ -30,4 +30,8 @@ def run_indent_mode_test(test):
 
 print "Running Indent Mode tests..."
 for test in INDENT_MODE_TESTS:
-    run_indent_mode_test(test)
+    run_test(test, indent_mode)
+
+print "Running Paren Mode tests..."
+for test in PAREN_MODE_TESTS:
+    run_test(test, paren_mode)
