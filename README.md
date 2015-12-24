@@ -24,7 +24,7 @@ python tests.py
 
 ## License
 
-[ISC License]
+[ISC license]
 
 [Parinfer]:http://shaunlebron.github.io/parinfer/
 [parinfer.js]:https://github.com/shaunlebron/parinfer/blob/master/lib/parinfer.js

@@ -1,10 +1,12 @@
 ## Parinfer.py - a Parinfer implementation in Python
+## v0.1.0
 ## https://github.com/oakmac/parinfer.py
-
+##
 ## More information about Parinfer can be found here:
 ## http://shaunlebron.github.io/parinfer/
-
-## Released under the ISC License:
+##
+## Copyright (c) 2015, Chris Oakman and other contributors
+## Released under the ISC license
 ## https://github.com/oakmac/parinfer.py/blob/master/LICENSE.md
 
 #-------------------------------------------------------------------------------
