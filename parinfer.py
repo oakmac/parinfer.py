@@ -1,5 +1,5 @@
 ## Parinfer.py - a Parinfer implementation in Python
-## v0.1.0
+## v0.2.0
 ## https://github.com/oakmac/parinfer.py
 ##
 ## More information about Parinfer can be found here:
