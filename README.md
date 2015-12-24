@@ -23,6 +23,12 @@ sudo pip install unittest2
 python tests.py
 ```
 
+To run a performance stress test:
+
+```
+python perf.js
+```
+
 ## License
 
 [ISC license]
