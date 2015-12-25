@@ -26,7 +26,7 @@ python tests.py
 To run a performance stress test:
 
 ```
-python perf.js
+python perf.py
 ```
 
 ## License
