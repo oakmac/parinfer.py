@@ -1,3 +1,6 @@
+## 0.3.0
+* Some tweaks imported from the JavaScript implementation.
+
 ## 0.2.0
 * Fix a bug / typo
 

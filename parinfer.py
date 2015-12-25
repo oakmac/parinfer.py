@@ -1,5 +1,5 @@
 ## Parinfer.py - a Parinfer implementation in Python
-## v0.2.0
+## v0.3.0
 ## https://github.com/oakmac/parinfer.py
 ##
 ## More information about Parinfer can be found here:
@@ -20,7 +20,7 @@ NEWLINE = '\n'
 SEMICOLON = ';'
 TAB = '\t'
 
-MATCHING_PAREN = {
+PARENS = {
     '{': '}',
     '}': '{',
     '[': ']',
@@ -87,23 +87,24 @@ def isWhitespace(c):
 # Stack States
 #-------------------------------------------------------------------------------
 
+# Returns the next-to-last element in the stack, or null if the stack is empty.
 def peek(stack, i):
-    if i is None:
-        i = 1
-    try:
-        return stack[len(stack) - i]
-    except IndexError:
+    idx = len(stack) - i;
+
+    # return null if the index is out of range
+    if idx < 0:
         return None
+
+    return stack[idx]
 
 def getPrevCh(stack, i):
     e = peek(stack, i)
     if e == None:
         return None
-    else:
-        return e['ch']
+    return e['ch']
 
 def isEscaping(stack):
-    return getPrevCh(stack, None) == BACKSLASH
+    return getPrevCh(stack, 1) == BACKSLASH
 
 def prevNonEscCh(stack):
     i = 1
@@ -121,7 +122,7 @@ def isInCode(stack):
     return isInStr(stack) != True and isInComment(stack) != True
 
 def isValidCloser(stack, ch):
-    return getPrevCh(stack, None) == MATCHING_PAREN[ch]
+    return getPrevCh(stack, 1) == PARENS[ch]
 
 #-------------------------------------------------------------------------------
 # Stack Operations
@@ -246,10 +247,10 @@ def closeParens(result, indentX):
     parens = ""
 
     while len(stack) > 0:
-        opener = peek(stack, None)
+        opener = peek(stack, 1)
         if opener['x'] >= indentX:
             stack.pop()
-            parens = parens + MATCHING_PAREN[opener['ch']]
+            parens = parens + PARENS[opener['ch']]
         else:
             break
 
@@ -337,10 +338,10 @@ def removeParenTrail(result):
 
 def updateInsertionPt(result):
     line = result['lines'][result['lineNo']]
-    try:
-        prevCh = line[result['x'] - 1]
-    except IndexError:
-        prevCh = None
+    prevChIdx = result['x'] - 1
+    prevCh = None
+    if prevChIdx >= 0:
+        prevCh = line[prevChIdx]
     ch = result['ch']
 
     shouldInsert = bool(isInCode(result['stack']) and
@@ -464,7 +465,7 @@ def formatText(text, options):
 
 def appendParenTrail(result):
     opener = result['stack'].pop()
-    closeCh = MATCHING_PAREN[opener['ch']]
+    closeCh = PARENS[opener['ch']]
     result['maxIndent'] = opener['x']
     idx = result['insert']['lineNo']
     line = result['lines'][idx]
@@ -472,7 +473,7 @@ def appendParenTrail(result):
     result['insert']['x'] = result['insert']['x'] + 1
 
 def minIndent(x, result):
-    opener = peek(result['stack'], None)
+    opener = peek(result['stack'], 1)
     if opener != None:
         startX = opener['x']
         return max(startX + 1, x)
@@ -484,25 +485,25 @@ def minDedent(x, result):
     return x
 
 def correctIndent(result):
-    opener = peek(result['stack'], None)
+    opener = peek(result['stack'], 1)
     delta = 0
     if opener != None and opener['indentDelta'] != None:
         delta = opener['indentDelta']
 
-    newX = result['x'] + delta
-    newX = minIndent(newX, result)
-    newX = minDedent(newX, result)
+    newX1 = result['x'] + delta
+    newX2 = minIndent(newX1, result)
+    newX3 = minDedent(newX2, result)
 
-    result['indentDelta'] = result['indentDelta'] + newX - result['x']
+    result['indentDelta'] = result['indentDelta'] + newX3 - result['x']
 
-    if newX != result['x']:
+    if newX3 != result['x']:
         indentStr = ""
-        for i in range(0, newX):
+        for i in range(0, newX3):
             indentStr = indentStr + " "
         line = result['lines'][result['lineNo']]
         newLine = replaceStringRange(line, 0, result['x'], indentStr)
         result['lines'][result['lineNo']] = newLine
-        result['x'] = newX
+        result['x'] = newX3
 
     result['trackIndent'] = False
     result['maxIndent'] = None
