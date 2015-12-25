@@ -1,5 +1,5 @@
 ## Parinfer.py - a Parinfer implementation in Python
-## v0.3.0
+## v0.4.0
 ## https://github.com/oakmac/parinfer.py
 ##
 ## More information about Parinfer can be found here:
@@ -119,7 +119,7 @@ def isInComment(stack):
     return prevNonEscCh(stack) == SEMICOLON
 
 def isInCode(stack):
-    return isInStr(stack) != True and isInComment(stack) != True
+    return (not isInStr(stack) and not isInComment(stack))
 
 def isValidCloser(stack, ch):
     return getPrevCh(stack, 1) == PARENS[ch]
@@ -130,10 +130,10 @@ def isValidCloser(stack, ch):
 
 def pushOpen(result):
     stack = result['stack']
-    if isEscaping(stack) == True:
+    if isEscaping(stack):
         stack.pop()
         return
-    if isInCode(stack) == True:
+    if isInCode(stack):
         stack.append({
             'ch': result['ch'],
             'indentDelta': result['indentDelta'],
@@ -142,14 +142,14 @@ def pushOpen(result):
 
 def pushClose(result):
     stack = result['stack']
-    if isEscaping(stack) == True:
+    if isEscaping(stack):
         stack.pop()
         return
 
     backup = result['backup']
     ch = result['ch']
-    if isInCode(stack) == True:
-        if isValidCloser(stack, ch) == True:
+    if isInCode(stack):
+        if isValidCloser(stack, ch):
             opener = stack.pop()
             result['maxIndent'] = opener['x']
             backup.append(opener)
@@ -158,15 +158,15 @@ def pushClose(result):
             result['ch'] = ""
 
 def pushTab(result):
-    if isInStr(result['stack']) != True:
+    if not isInStr(result['stack']):
         result['ch'] = "  "
 
 def pushSemicolon(result):
     stack = result['stack']
-    if isEscaping(stack) == True:
+    if isEscaping(stack):
         stack.pop()
         return
-    if isInCode(stack) == True:
+    if isInCode(stack):
         stack.append({
             'ch': result['ch'],
             'x': result['x'],
@@ -174,15 +174,15 @@ def pushSemicolon(result):
 
 def pushNewline(result):
     stack = result['stack']
-    if isEscaping(stack) == True:
+    if isEscaping(stack):
         stack.pop()
-    if isInComment(stack) == True:
+    if isInComment(stack):
         stack.pop()
     result['ch'] = ""
 
 def pushEscape(result):
     stack = result['stack']
-    if isEscaping(stack) == True:
+    if isEscaping(stack):
         stack.pop()
     else:
         stack.append({
@@ -192,10 +192,10 @@ def pushEscape(result):
 
 def pushQuote(result):
     stack = result['stack']
-    if isEscaping(stack) == True or isInStr(stack) == True:
+    if isEscaping(stack) or isInStr(stack):
         stack.pop()
         return
-    if isInComment(stack) == True:
+    if isInComment(stack):
         result['quoteDanger'] = not result['quoteDanger']
         return
     # default case
@@ -206,15 +206,15 @@ def pushQuote(result):
 
 def pushDefault(result):
     stack = result['stack']
-    if isEscaping(stack) == True:
+    if isEscaping(stack):
         stack.pop()
 
 def pushChar(result):
     ch = result['ch']
-    if isOpenParen(ch) == True:
+    if isOpenParen(ch):
         pushOpen(result)
         return
-    if isCloseParen(ch) == True:
+    if isCloseParen(ch):
         pushClose(result)
         return
     if ch == TAB:
@@ -262,24 +262,28 @@ def closeParens(result, indentX):
 
 def updateParenTrail(result):
     ch = result['ch']
-    shouldPass = bool(ch == SEMICOLON or
-                      ch == COMMA or
-                      isWhitespace(ch) or
-                      isCloseParen(ch))
-
     stack = result['stack']
-    shouldReset = bool(isInCode(stack) and
-                       (isEscaping(stack) or shouldPass != True))
+    closeParen = isCloseParen(ch)
+    escaping = isEscaping(stack)
+    inCode = isInCode(stack)
 
-    result['cursorInComment'] = bool(result['cursorInComment'] or
-                                     (result['cursorLine'] == result['lineNo'] and
-                                      result['x'] == result['cursorX'] and
-                                      isInComment(stack)))
+    shouldPass = (ch == SEMICOLON or
+                  ch == COMMA or
+                  isWhitespace(ch) or
+                  closeParen)
 
-    shouldUpdate = bool(isInCode(stack) and
-                        isEscaping(stack) != True and
-                        isCloseParen(ch) and
-                        isValidCloser(stack, ch))
+    shouldReset = (inCode and
+                   (escaping or not shouldPass))
+
+    result['cursorInComment'] = (result['cursorInComment'] or
+                                 (result['cursorLine'] == result['lineNo'] and
+                                  result['x'] == result['cursorX'] and
+                                  isInComment(stack)))
+
+    shouldUpdate = (inCode and
+                    not escaping and
+                    closeParen and
+                    isValidCloser(stack, ch))
 
     if shouldReset:
         result['backup'] = []
@@ -293,10 +297,10 @@ def updateParenTrail(result):
 def blockParenTrail(result):
     start = result['parenTrail']['start']
     end = result['parenTrail']['end']
-    isCursorBlocking = bool(result['lineNo'] == result['cursorLine'] and
-                            start != None and
-                            result['cursorX'] > start and
-                            result['cursorInComment'] != True)
+    isCursorBlocking = (result['lineNo'] == result['cursorLine'] and
+                        start != None and
+                        result['cursorX'] > start and
+                        not result['cursorInComment'])
 
     if start != None and isCursorBlocking:
         start = max(start, result['cursorX'])
@@ -344,10 +348,10 @@ def updateInsertionPt(result):
         prevCh = line[prevChIdx]
     ch = result['ch']
 
-    shouldInsert = bool(isInCode(result['stack']) and
-                        ch != "" and
-                        (isWhitespace(ch) != True or prevCh == BACKSLASH) and
-                        (isCloseParen(ch) != True or result['lineNo'] == result['cursorLine']))
+    shouldInsert = (isInCode(result['stack']) and
+                    ch != "" and
+                    (not isWhitespace(ch) or prevCh == BACKSLASH) and
+                    (not isCloseParen(ch) or result['lineNo'] == result['cursorLine']))
 
     if shouldInsert:
         result['insert'] = {
@@ -362,18 +366,18 @@ def processIndentTrigger(result):
 def processIndent(result):
     stack = result['stack']
     ch = result['ch']
-    checkIndent = bool(result['trackIndent'] and
-                       isInCode(stack) and
-                       isWhitespace(ch) != True and
-                       ch != SEMICOLON)
-    skip = bool(checkIndent and isCloseParen(ch))
-    atIndent = bool(checkIndent and skip != True)
-    quit = bool(atIndent and result['quoteDanger'])
+    checkIndent = (result['trackIndent'] and
+                   isInCode(stack) and
+                   not isWhitespace(ch) and
+                   ch != SEMICOLON)
+    skip = (checkIndent and isCloseParen(ch))
+    atIndent = (checkIndent and not skip)
+    quit = (atIndent and result['quoteDanger'])
 
     result['quit'] = quit
-    result['process'] = bool(skip != True and quit != True)
+    result['process'] = (not skip and not quit)
 
-    if atIndent and quit != True:
+    if atIndent and not quit:
         processIndentTrigger(result)
 
 def updateLine(result, origCh):
@@ -409,7 +413,7 @@ def processLine(result, line):
     result['backup'] = []
     result['cursorInComment'] = False
     result['parenTrail'] = {'start': None, 'end': None}
-    result['trackIndent'] = bool(len(stack) > 0 and isInStr(stack) != True)
+    result['trackIndent'] = (len(stack) > 0 and not isInStr(stack))
     result['lines'].append(line)
     result['x'] = 0
 
@@ -425,8 +429,8 @@ def processLine(result, line):
 
 def finalizeResult(result):
     stack = result['stack']
-    result['success'] = bool(isInStr(stack) != True and
-                             result['quoteDanger'] != True)
+    result['success'] = (not isInStr(stack) and
+                         not result['quoteDanger'])
     if result['success'] and len(stack) > 0:
         closeParens(result, None)
 
@@ -509,36 +513,42 @@ def correctIndent(result):
     result['maxIndent'] = None
 
 def handleCursorDelta(result):
-    hasCursorDelta = bool(result['cursorLine'] == result['lineNo'] and
-                          result['cursorX'] == result['x'] and
-                          result['cursorX'] != None)
+    hasCursorDelta = (result['cursorLine'] == result['lineNo'] and
+                      result['cursorX'] == result['x'] and
+                      result['cursorX'] != None)
     if hasCursorDelta and result['cursorDx'] != None:
         result['indentDelta'] = result['indentDelta'] + result['cursorDx']
 
 def processIndent_paren(result):
     ch = result['ch']
     stack = result['stack']
+    closeParen = isCloseParen(ch)
 
-    checkIndent = bool(result['trackIndent'] and
-                       isInCode(stack) and
-                       isWhitespace(ch) != True and
-                       result['ch'] != SEMICOLON)
+    checkIndent = (result['trackIndent'] and
+                   isInCode(stack) and
+                   not isWhitespace(ch) and
+                   result['ch'] != SEMICOLON)
 
-    atValidCloser = bool(checkIndent and
-                         isCloseParen(ch) and
-                         isValidCloser(stack, ch))
+    atValidCloser = (checkIndent and
+                     closeParen and
+                     isValidCloser(stack, ch))
 
-    isCursorHolding = bool(result['lineNo'] == result['cursorLine'] and
-                           result['cursorX'] != None and
-                           result['cursorX'] <= result['x'])
+    isCursorHolding = (result['lineNo'] == result['cursorLine'] and
+                       result['cursorX'] != None and
+                       result['cursorX'] <= result['x'])
 
-    shouldMoveCloser = bool(atValidCloser and isCursorHolding != True)
-    skip = bool(checkIndent and isCloseParen(ch) and isCursorHolding != True)
-    atIndent = bool(checkIndent and skip != True)
-    quit = bool(atIndent and result['quoteDanger'])
+    shouldMoveCloser = (atValidCloser and
+                        not isCursorHolding)
+
+    skip = (checkIndent and
+            closeParen and
+            not isCursorHolding)
+
+    atIndent = (checkIndent and not skip)
+    quit = (atIndent and result['quoteDanger'])
 
     result['quit'] = quit
-    result['process'] = bool(skip != True)
+    result['process'] = (not skip)
 
     if quit:
         return
@@ -558,7 +568,6 @@ def processChar_paren(result, ch):
 
     if result['quit']:
         return
-
     if result['process']:
         # NOTE: the order here is important!
         updateParenTrail(result)
@@ -598,7 +607,7 @@ def processLine_paren(result, line):
     result['backup'] = []
     result['cursorInComment'] = False
     result['parenTrail'] = {'start': None, 'end': None}
-    result['trackIndent'] = bool(isInStr(result['stack']) != True)
+    result['trackIndent'] = (not isInStr(result['stack']))
     result['lines'].append(line)
     result['x'] = 0
     result['indentDelta'] = 0
@@ -609,12 +618,12 @@ def processLine_paren(result, line):
         if result['quit']:
             break
 
-    if result['quit'] != True:
+    if not result['quit']:
         formatParenTrail(result)
 
 def finalizeResult_paren(result):
-    result['success'] = bool(len(result['stack']) == 0 and
-                             result['quoteDanger'] != True)
+    result['success'] = (len(result['stack']) == 0 and
+                         not result['quoteDanger'])
 
 def processText_paren(text, options):
     result = initialResult()

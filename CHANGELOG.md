@@ -1,3 +1,6 @@
+## 0.4.0
+* Performance and readability improvements
+
 ## 0.3.0
 * Some tweaks imported from the JavaScript implementation.
 
