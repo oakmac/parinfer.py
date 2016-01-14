@@ -9,6 +9,8 @@
 ## Released under the ISC license
 ## https://github.com/oakmac/parinfer.py/blob/master/LICENSE.md
 
+import re
+
 #-------------------------------------------------------------------------------
 # Constants
 #-------------------------------------------------------------------------------
@@ -23,8 +25,7 @@ NEWLINE = '\n'
 SEMICOLON = ';'
 TAB = '\t'
 
-## TODO: regex here
-LINE_ENDING = "\n"
+LINE_ENDING_REGEX = re.compile(r"\r?\n")
 
 PARENS = {
     '{': '}',
@@ -54,7 +55,7 @@ def initialResult(text, options, mode):
     result = {
         'mode': mode,
         'origText': text,
-        'origLines': text.split(LINE_ENDING),
+        'origLines': LINE_ENDING_REGEX.split(text),
         'lines': [],
         'lineNo': -1,
         'ch': '',
@@ -117,6 +118,9 @@ errorMessages[ERROR_UNCLOSED_PAREN] = "Unmatched open-paren."
 def cacheErrorPos(result, name, lineNo, x):
     result['errorPosCache'][name] = {'lineNo': lineNo, 'x': x}
 
+class ParinferError(Exception):
+    pass
+
 def error(result, name, lineNo, x):
     cache = result['errorPosCache'][name]
 
@@ -152,9 +156,13 @@ def multiplyString(text, n):
         result = result + text
     return result
 
+# NOTE: We assume that if the CR char "\r" is used anywhere, we should use CRLF
+#       line-endings after every line.
 def getLineEnding(text):
-    ## TODO: write me
-    return None
+    i = text.find("\r")
+    if i != -1:
+        return "\r\n"
+    return "\n"
 
 #-------------------------------------------------------------------------------
 # Line Operations
@@ -271,9 +279,8 @@ def afterBackslash(result):
 
     if result['ch'] == NEWLINE:
         if result['isInCode']:
-            ## TODO: raise exception here
-            # raise ParinferError error(result, ERROR_EOL_BACKSLASH, result['lineNo'], result['x'] - 1)
-            return None
+            err = error(result, ERROR_EOL_BACKSLASH, result['lineNo'], result['x'] - 1)
+            raise ParinferError(err)
         onNewLine(result)
 
 def onChar(result):
@@ -434,16 +441,47 @@ def finishNewParenTrail(result):
 #-------------------------------------------------------------------------------
 
 def correctIndent(result):
-    # TODO: write me
-    return None
+    origIndent = result['x']
+    newIndent = origIndent
+    minIndent = 0
+    maxIndent = result['maxIndent']
+
+    opener = peek(result['parenStack'])
+    if opener is not None:
+        minIndent = opener['x'] + 1
+        newIndent = newIndent + opener['indentDelta']
+
+    newIndent = clamp(newIndent, minIndent, maxIndent)
+
+    if newIndent != origIndent:
+        indentStr = multiplyString(" ", newIndent)
+        replaceWithinLine(result, result['lineNo'], 0, origIndent, indentStr)
+        result['x'] = newIndent
+        result['indentDelta'] = result['indentDelta'] + newIndent - origIndent
 
 def onProperIndent(result):
-    # TODO: write me
-    return None
+    result['trackingIndent'] = False
+
+    if result['quoteDanger']:
+        err = error(result, ERROR_QUOTE_DANGER)
+        raise ParinferError(err)
+
+    if result['mode'] == INDENT_MODE:
+        correctParenTrail(result, result['x'])
+    elif result['mode'] == PAREN_MODE:
+        correctIndent(result)
 
 def onLeadingCloseParen(result):
-    # TODO: write me
-    return None
+    result['skipChar'] = True
+    result['trackingIndent'] = True
+
+    if result['mode'] == PAREN_MODE:
+        if isValidCloseParen(result['parenStack'], result['ch']):
+            if isCursorOnLeft(result):
+                result['skipChar'] = False
+                onProperIndent(result)
+            else:
+                appendParenTrail(result)
 
 def onIndent(result):
     if isCloseParen(result['ch']):
@@ -459,8 +497,24 @@ def onIndent(result):
 #-------------------------------------------------------------------------------
 
 def processChar(result, ch):
-    # TODO: write me
-    return None
+    origCh = ch
+
+    result['ch'] = ch
+    result['skipChar'] = False
+
+    if result['mode'] == PAREN_MODE:
+        handleCursorDelta(result)
+
+    if result['trackingIndent'] and ch != " " and ch != TAB:
+        onIndent(result)
+
+    if result['skipChar']:
+        result['ch'] = ""
+    else:
+        onChar(result)
+        updateParenTrailBounds(result)
+
+    commitChar(result, origCh)
 
 def processLine(result, line):
     initLine(result, line)
@@ -479,8 +533,23 @@ def processLine(result, line):
         finishNewParenTrail(result)
 
 def finalizeResult(result):
-    # TODO: write me
-    return None
+    if result['quoteDanger']:
+        err = error(result, ERROR_QUOTE_DANGER)
+        raise ParinferError(err)
+
+    if result['isInStr']:
+        err = error(result, ERROR_UNCLOSED_QUOTE)
+        raise ParinferError(err)
+
+    if len(result['parenStack']) != 0:
+        if result['mode'] == PAREN_MODE:
+            opener = peek(result['parenStack'])
+            err = error(result, ERROR_UNCLOSED_PAREN, opener['lineNo'], opener['x'])
+            raise ParinferError(err)
+        elif result['mode'] == INDENT_MODE:
+            correctParenTrail(result, 0)
+
+    result['success'] = True
 
 def processError(result, e):
     result['success'] = False
@@ -492,8 +561,16 @@ def processError(result, e):
         result['error']['message'] = e['stack']
 
 def processText(text, options, mode):
-    # TODO: write me
-    return None
+    result = getInitialResult(text, options, mode)
+
+    try:
+        for i in len(result['origLines']):
+            processLine(result, result['origLines'][i])
+        finalizeResult(result)
+    except ParinferError as err:
+        processError(result, err)
+
+    return result
 
 #-------------------------------------------------------------------------------
 # Public API Helpers
