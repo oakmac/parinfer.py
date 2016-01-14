@@ -55,7 +55,7 @@ def initialResult(text, options, mode):
     result = {
         'mode': mode,
         'origText': text,
-        'origLines': LINE_ENDING_REGEX.split(text),
+        'origLines': text.split(NEWLINE),
         'lines': [],
         'lineNo': -1,
         'ch': '',
@@ -122,12 +122,10 @@ class ParinferError(Exception):
     pass
 
 def error(result, name, lineNo, x):
-    cache = result['errorPosCache'][name]
-
     if lineNo is None:
-        lineNo = cache['lineNo']
+        lineNo = result['errorPosCache'][name]['lineNo']
     if x is None:
-        x = cache['x']
+        x = result['errorPosCache'][name]['x']
 
     return {
         'parinferError': True,
@@ -152,7 +150,7 @@ def removeWithinString(orig, start, end):
 
 def multiplyString(text, n):
     result = ""
-    for i in n:
+    for i in range(0, n):
         result = result + text
     return result
 
@@ -269,7 +267,7 @@ def onQuote(result):
             cacheErrorPos(result, ERROR_QUOTE_DANGER, result['lineNo'], result['x'])
     else:
         result['isInStr'] = True
-        cacheErrorPos(result, ERROR_UNCLOSED_QUOTE, result['lineNo'], result['x]'])
+        cacheErrorPos(result, ERROR_UNCLOSED_QUOTE, result['lineNo'], result['x'])
 
 def onBackslash(result):
     result['isEscaping'] = True
@@ -463,7 +461,7 @@ def onProperIndent(result):
     result['trackingIndent'] = False
 
     if result['quoteDanger']:
-        err = error(result, ERROR_QUOTE_DANGER)
+        err = error(result, ERROR_QUOTE_DANGER, None, None)
         raise ParinferError(err)
 
     if result['mode'] == INDENT_MODE:
@@ -526,19 +524,19 @@ def processLine(result, line):
         result['trackingIndent'] = not result['isInStr']
 
     chars = line + NEWLINE
-    for i in len(chars):
-        processChar(result, chars[i])
+    for c in chars:
+        processChar(result, c)
 
     if result['lineNo'] == result['parenTrail']['lineNo']:
         finishNewParenTrail(result)
 
 def finalizeResult(result):
     if result['quoteDanger']:
-        err = error(result, ERROR_QUOTE_DANGER)
+        err = error(result, ERROR_QUOTE_DANGER, None, None)
         raise ParinferError(err)
 
     if result['isInStr']:
-        err = error(result, ERROR_UNCLOSED_QUOTE)
+        err = error(result, ERROR_UNCLOSED_QUOTE, None, None)
         raise ParinferError(err)
 
     if len(result['parenStack']) != 0:
@@ -561,14 +559,15 @@ def processError(result, e):
         result['error']['message'] = e['stack']
 
 def processText(text, options, mode):
-    result = getInitialResult(text, options, mode)
+    result = initialResult(text, options, mode)
 
     try:
-        for i in len(result['origLines']):
-            processLine(result, result['origLines'][i])
+        for line in result['origLines']:
+            processLine(result, line)
         finalizeResult(result)
-    except ParinferError as err:
-        processError(result, err)
+    except ParinferError as e:
+        errorDetails = e.args[0]
+        processError(result, errorDetails)
 
     return result
 
@@ -578,7 +577,7 @@ def processText(text, options, mode):
 
 def getChangedLines(result):
     changedLines = []
-    for i in len(result['lines']):
+    for i in range(0, len(result['lines'])):
         if result['lines'][i] != result['origLines'][i]:
             changedLines.append({
                 'lineNo': i,
