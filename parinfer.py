@@ -1,13 +1,13 @@
-# Parinfer.py - a Parinfer implementation in Python
-# v0.5.0
-# https://github.com/oakmac/parinfer.py
-#
-# More information about Parinfer can be found here:
-# http://shaunlebron.github.io/parinfer/
-#
-# Copyright (c) 2015, Chris Oakman and other contributors
-# Released under the ISC license
-# https://github.com/oakmac/parinfer.py/blob/master/LICENSE.md
+## Parinfer.py - a Parinfer implementation in Python
+## v0.5.0
+## https://github.com/oakmac/parinfer.py
+##
+## More information about Parinfer can be found here:
+## http://shaunlebron.github.io/parinfer/
+##
+## Copyright (c) 2015, Chris Oakman and other contributors
+## Released under the ISC license
+## https://github.com/oakmac/parinfer.py/blob/master/LICENSE.md
 
 #-------------------------------------------------------------------------------
 # Constants
@@ -17,6 +17,7 @@ INDENT_MODE = 'INDENT_MODE'
 PAREN_MODE = 'PAREN_MODE'
 
 BACKSLASH = '\\'
+COMMA = ','
 DOUBLE_QUOTE = '"'
 NEWLINE = '\n'
 SEMICOLON = ';'
@@ -41,14 +42,12 @@ PARENS = {
 def isOpenParen(c):
     return c == "{" or c == "(" or c == "["
 
-
 def isCloseParen(c):
     return c == "}" or c == ")" or c == "]"
 
 #-------------------------------------------------------------------------------
 # Result Structure
 #-------------------------------------------------------------------------------
-
 
 def initialResult(text, options, mode):
     """Returns a dictionary of the initial state."""
@@ -118,7 +117,6 @@ errorMessages[ERROR_UNCLOSED_PAREN] = "Unmatched open-paren."
 def cacheErrorPos(result, name, lineNo, x):
     result['errorPosCache'][name] = {'lineNo': lineNo, 'x': x}
 
-
 def error(result, name, lineNo, x):
     cache = result['errorPosCache'][name]
 
@@ -162,7 +160,32 @@ def getLineEnding(text):
 # Line Operations
 #-------------------------------------------------------------------------------
 
-## TODO: write me
+def insertWithinLine(result, lineNo, idx, insert):
+    line = result['lines'][lineNo]
+    result['lines'][lineNo] = insertWithinString(line, idx, insert)
+
+def replaceWithinLine(result, lineNo, start, end, replace):
+    line = result['lines'][lineNo]
+    result['lines'][lineNo] = replaceWithinString(line, start, end, replace)
+
+def removeWithinLine(result, lineNo, start, end):
+    line = result['lines'][lineNo]
+    result['lines'][lineNo] = removeWithinString(line, start, end)
+
+def initLine(result, line):
+    result['x'] = 0
+    result['lineNo'] = result['lineNo'] + 1
+    result['lines'].append(line)
+
+    # reset line-specific state
+    result['commentX'] = None
+    result['indentDelta'] = 0
+
+def commitChar(result, origCh):
+    ch = result['ch']
+    if origCh != ch:
+        replaceWithinLine(result, result['lineNo'], result['x'], result['x'] + len(origCh), ch)
+    result['x'] = result['x'] + len(ch)
 
 #-------------------------------------------------------------------------------
 # Misc Utils
@@ -248,10 +271,10 @@ def afterBackslash(result):
 
     if result['ch'] == NEWLINE:
         if result['isInCode']:
-            None
             ## TODO: raise exception here
             # raise ParinferError error(result, ERROR_EOL_BACKSLASH, result['lineNo'], result['x'] - 1)
-        onNewline(result)
+            return None
+        onNewLine(result)
 
 def onChar(result):
     ch = result['ch']
@@ -270,7 +293,7 @@ def onChar(result):
     elif ch == TAB:
         onTab(result)
     elif ch == NEWLINE:
-        onNewline(result)
+        onNewLine(result)
 
     result['isInCode'] = (not result['isInComment'] and not result['isInStr'])
 
@@ -375,8 +398,7 @@ def cleanParenTrail(result):
     startX = result['parenTrail']['startX']
     endX = result['parenTrail']['endX']
 
-    if (startX == endX or
-        result['lineNo'] != result['parenTrail']['lineNo']):
+    if (startX == endX or result['lineNo'] != result['parenTrail']['lineNo']):
         return
 
     line = result['lines'][result['lineNo']]
@@ -407,603 +429,109 @@ def finishNewParenTrail(result):
     elif result['mode'] == PAREN_MODE:
         cleanParenTrail(result)
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-def getPrevCh(stack, i):
-    e = peek(stack, i)
-    if e is None:
-        return None
-    return e['ch']
-
-def isEscaping(stack):
-    return getPrevCh(stack, 1) == BACKSLASH
-
-def prevNonEscCh(stack):
-    i = 1
-    if isEscaping(stack):
-        i = 2
-    return getPrevCh(stack, i)
-
-def isInStr(stack):
-    return prevNonEscCh(stack) == DOUBLE_QUOTE
-
-def isInComment(stack):
-    return prevNonEscCh(stack) == SEMICOLON
-
-def isInCode(stack):
-    return (not isInStr(stack) and not isInComment(stack))
-
-def isValidCloser(stack, ch):
-    return getPrevCh(stack, 1) == PARENS[ch]
-
 #-------------------------------------------------------------------------------
-# Stack Operations
+# Indentation functions
 #-------------------------------------------------------------------------------
-
-def pushOpen(result):
-    stack = result['stack']
-    if isEscaping(stack):
-        stack.pop()
-        return
-    if isInCode(stack):
-        stack.append({
-            'ch': result['ch'],
-            'indentDelta': result['indentDelta'],
-            'x': result['x'],
-        })
-
-def pushClose(result):
-    stack = result['stack']
-    if isEscaping(stack):
-        stack.pop()
-        return
-
-    backup = result['backup']
-    ch = result['ch']
-    if isInCode(stack):
-        if isValidCloser(stack, ch):
-            opener = stack.pop()
-            result['maxIndent'] = opener['x']
-            backup.append(opener)
-        else:
-            # erase non-matched paren
-            result['ch'] = ""
-
-def pushTab(result):
-    if not isInStr(result['stack']):
-        result['ch'] = "  "
-
-def pushSemicolon(result):
-    stack = result['stack']
-    if isEscaping(stack):
-        stack.pop()
-        return
-    if isInCode(stack):
-        stack.append({
-            'ch': result['ch'],
-            'x': result['x'],
-        })
-
-def pushNewline(result):
-    stack = result['stack']
-    if isEscaping(stack):
-        stack.pop()
-    if isInComment(stack):
-        stack.pop()
-    result['ch'] = ""
-
-def pushEscape(result):
-    stack = result['stack']
-    if isEscaping(stack):
-        stack.pop()
-    else:
-        stack.append({
-            'ch': result['ch'],
-            'x': result['x'],
-        })
-
-def pushQuote(result):
-    stack = result['stack']
-    if isEscaping(stack) or isInStr(stack):
-        stack.pop()
-        return
-    if isInComment(stack):
-        result['quoteDanger'] = not result['quoteDanger']
-        return
-    # default case
-    stack.append({
-        'ch': result['ch'],
-        'x': result['x'],
-    })
-
-def pushDefault(result):
-    stack = result['stack']
-    if isEscaping(stack):
-        stack.pop()
-
-def pushChar(result):
-    ch = result['ch']
-    if isOpenParen(ch):
-        pushOpen(result)
-        return
-    if isCloseParen(ch):
-        pushClose(result)
-        return
-    if ch == TAB:
-        pushTab(result)
-        return
-    if ch == SEMICOLON:
-        pushSemicolon(result)
-        return
-    if ch == NEWLINE:
-        pushNewline(result)
-        return
-    if ch == BACKSLASH:
-        pushEscape(result)
-        return
-    if ch == DOUBLE_QUOTE:
-        pushQuote(result)
-        return
-    # default case
-    pushDefault(result)
-
-#-------------------------------------------------------------------------------
-# Indent Mode Operations
-#-------------------------------------------------------------------------------
-
-def closeParens(result, indentX):
-    if indentX is None:
-        indentX = 0
-
-    stack = result['stack']
-    parens = ""
-
-    while len(stack) > 0:
-        opener = peek(stack, 1)
-        if opener['x'] >= indentX:
-            stack.pop()
-            parens = parens + PARENS[opener['ch']]
-        else:
-            break
-
-    insertLineNo = result['insert']['lineNo']
-    newString = insertString(result['lines'][insertLineNo],
-                             result['insert']['x'],
-                             parens)
-    result['lines'][insertLineNo] = newString
-
-def updateParenTrail(result):
-    ch = result['ch']
-    stack = result['stack']
-    closeParen = isCloseParen(ch)
-    escaping = isEscaping(stack)
-    inCode = isInCode(stack)
-
-    shouldPass = (ch == SEMICOLON or
-                  ch == COMMA or
-                  isWhitespace(ch) or
-                  closeParen)
-
-    shouldReset = (inCode and
-                   (escaping or not shouldPass))
-
-    result['cursorInComment'] = (result['cursorInComment'] or
-                                 (result['cursorLine'] == result['lineNo'] and
-                                  result['x'] == result['cursorX'] and
-                                  isInComment(stack)))
-
-    shouldUpdate = (inCode and
-                    not escaping and
-                    closeParen and
-                    isValidCloser(stack, ch))
-
-    if shouldReset:
-        result['backup'] = []
-        result['parenTrail'] = {'start': None, 'end': None}
-        result['maxIndent'] = None
-    elif shouldUpdate:
-        if result['parenTrail']['start'] is None:
-            result['parenTrail']['start'] = result['x']
-        result['parenTrail']['end'] = result['x'] + 1
-
-def blockParenTrail(result):
-    start = result['parenTrail']['start']
-    end = result['parenTrail']['end']
-    isCursorBlocking = (result['lineNo'] == result['cursorLine'] and
-                        start is not None and
-                        result['cursorX'] > start and
-                        not result['cursorInComment'])
-
-    if start is not None and isCursorBlocking:
-        start = max(start, result['cursorX'])
-
-    if end is not None and isCursorBlocking:
-        end = max(end, result['cursorX'])
-
-    if start == end:
-        start = None
-        end = None
-
-    result['parenTrail']['start'] = start
-    result['parenTrail']['end'] = end
-
-def removeParenTrail(result):
-    start = result['parenTrail']['start']
-    end = result['parenTrail']['end']
-
-    if start is None or end is None:
-        return
-
-    stack = result['stack']
-    backup = result['backup']
-
-    line = result['lines'][result['lineNo']]
-    removeCount = 0
-    for i in range(start, end):
-        if isCloseParen(line[i]):
-            removeCount = removeCount + 1
-
-    ignoreCount = len(backup) - removeCount
-    while ignoreCount != len(backup):
-        stack.append(backup.pop())
-
-    result['lines'][result['lineNo']] = removeStringRange(line, start, end)
-
-    if result['insert']['lineNo'] == result['lineNo']:
-        result['insert']['x'] = min(result['insert']['x'], start)
-
-def updateInsertionPt(result):
-    line = result['lines'][result['lineNo']]
-    prevChIdx = result['x'] - 1
-    prevCh = None
-    if prevChIdx >= 0:
-        prevCh = line[prevChIdx]
-    ch = result['ch']
-
-    shouldInsert = (isInCode(result['stack']) and
-                    ch != "" and
-                    (not isWhitespace(ch) or prevCh == BACKSLASH) and
-                    (not isCloseParen(ch) or result['lineNo'] == result['cursorLine']))
-
-    if shouldInsert:
-        result['insert'] = {
-            'lineNo': result['lineNo'],
-            'x': result['x'] + 1,
-        }
-
-def processIndentTrigger(result):
-    closeParens(result, result['x'])
-    result['trackIndent'] = False
-
-def processIndent(result):
-    stack = result['stack']
-    ch = result['ch']
-    checkIndent = (result['trackIndent'] and
-                   isInCode(stack) and
-                   not isWhitespace(ch) and
-                   ch != SEMICOLON)
-    skip = (checkIndent and isCloseParen(ch))
-    atIndent = (checkIndent and not skip)
-    quit = (atIndent and result['quoteDanger'])
-
-    result['quit'] = quit
-    result['process'] = (not skip and not quit)
-
-    if atIndent and not quit:
-        processIndentTrigger(result)
-
-def updateLine(result, origCh):
-    ch = result['ch']
-    if origCh != ch:
-        lineNo = result['lineNo']
-        line = result['lines'][lineNo]
-        result['lines'][lineNo] = replaceStringRange(line, result['x'], result['x'] + len(origCh), ch)
-
-def processChar(result, ch):
-    origCh = ch
-    result['ch'] = ch
-    processIndent(result)
-
-    if result['quit']:
-        return
-
-    if result['process']:
-        # NOTE: the order here is important!
-        updateParenTrail(result)
-        pushChar(result)
-        updateInsertionPt(result)
-    else:
-        result['ch'] = ""
-
-    updateLine(result, origCh)
-    result['x'] = result['x'] + len(result['ch'])
-
-def processLine(result, line):
-    stack = result['stack']
-
-    result['lineNo'] = result['lineNo'] + 1
-    result['backup'] = []
-    result['cursorInComment'] = False
-    result['parenTrail'] = {'start': None, 'end': None}
-    result['trackIndent'] = (len(stack) > 0 and not isInStr(stack))
-    result['lines'].append(line)
-    result['x'] = 0
-
-    chars = line + NEWLINE
-    for ch in chars:
-        processChar(result, ch)
-        if result['quit']:
-            break
-
-    if result['quit'] is False:
-        blockParenTrail(result)
-        removeParenTrail(result)
-
-def finalizeResult(result):
-    stack = result['stack']
-    result['success'] = (not isInStr(stack) and
-                         not result['quoteDanger'])
-    if result['success'] and len(stack) > 0:
-        closeParens(result, None)
-
-def processText(text, options):
-    result = initialResult()
-
-    if isinstance(options, dict):
-        if 'cursorLine' in options:
-            result['cursorLine'] = options['cursorLine']
-        if 'cursorX' in options:
-            result['cursorX'] = options['cursorX']
-
-    lines = text.split(NEWLINE)
-    for line in lines:
-        processLine(result, line)
-        if result['quit']:
-            break
-
-    finalizeResult(result)
-    return result
-
-def formatText(text, options):
-    result = processText(text, options)
-    outText = text
-    if result['success']:
-        outText = NEWLINE.join(result['lines'])
-    return {
-        'text': outText,
-        'success': result['success'],
-    }
-
-#-------------------------------------------------------------------------------
-# Paren Mode Operations
-# NOTE: Paren Mode re-uses some Indent Mode functions
-#-------------------------------------------------------------------------------
-
-def appendParenTrail(result):
-    opener = result['stack'].pop()
-    closeCh = PARENS[opener['ch']]
-    result['maxIndent'] = opener['x']
-    idx = result['insert']['lineNo']
-    line = result['lines'][idx]
-    result['lines'][idx] = insertString(line, result['insert']['x'], closeCh)
-    result['insert']['x'] = result['insert']['x'] + 1
-
-def minIndent(x, result):
-    opener = peek(result['stack'], 1)
-    if opener is not None:
-        startX = opener['x']
-        return max(startX + 1, x)
-    return x
-
-def minDedent(x, result):
-    if result['maxIndent'] is not None:
-        return min(result['maxIndent'], x)
-    return x
 
 def correctIndent(result):
-    opener = peek(result['stack'], 1)
-    delta = 0
-    if opener is not None and opener['indentDelta'] is not None:
-        delta = opener['indentDelta']
+    # TODO: write me
+    return None
 
-    newX1 = result['x'] + delta
-    newX2 = minIndent(newX1, result)
-    newX3 = minDedent(newX2, result)
+def onProperIndent(result):
+    # TODO: write me
+    return None
 
-    result['indentDelta'] = result['indentDelta'] + newX3 - result['x']
+def onLeadingCloseParen(result):
+    # TODO: write me
+    return None
 
-    if newX3 != result['x']:
-        indentStr = ""
-        for i in range(0, newX3):
-            indentStr = indentStr + " "
-        line = result['lines'][result['lineNo']]
-        newLine = replaceStringRange(line, 0, result['x'], indentStr)
-        result['lines'][result['lineNo']] = newLine
-        result['x'] = newX3
+def onIndent(result):
+    if isCloseParen(result['ch']):
+        onLeadingCloseParen(result)
+    elif result['ch'] == SEMICOLON:
+        # comments don't count as indentation points
+        result['trackingIndent'] = False
+    elif result['ch'] != NEWLINE:
+        onProperIndent(result)
 
-    result['trackIndent'] = False
-    result['maxIndent'] = None
+#-------------------------------------------------------------------------------
+# High-level processing functions
+#-------------------------------------------------------------------------------
 
-def handleCursorDelta(result):
-    hasCursorDelta = (result['cursorLine'] == result['lineNo'] and
-                      result['cursorX'] == result['x'] and
-                      result['cursorX'] is not None)
-    if hasCursorDelta and result['cursorDx'] is not None:
-        result['indentDelta'] = result['indentDelta'] + result['cursorDx']
+def processChar(result, ch):
+    # TODO: write me
+    return None
 
-def processIndent_paren(result):
-    ch = result['ch']
-    stack = result['stack']
-    closeParen = isCloseParen(ch)
+def processLine(result, line):
+    initLine(result, line)
 
-    checkIndent = (result['trackIndent'] and
-                   isInCode(stack) and
-                   not isWhitespace(ch) and
-                   result['ch'] != SEMICOLON)
-
-    atValidCloser = (checkIndent and
-                     closeParen and
-                     isValidCloser(stack, ch))
-
-    isCursorHolding = (result['lineNo'] == result['cursorLine'] and
-                       result['cursorX'] is not None and
-                       result['cursorX'] <= result['x'])
-
-    shouldMoveCloser = (atValidCloser and
-                        not isCursorHolding)
-
-    skip = (checkIndent and
-            closeParen and
-            not isCursorHolding)
-
-    atIndent = (checkIndent and not skip)
-    quit = (atIndent and result['quoteDanger'])
-
-    result['quit'] = quit
-    result['process'] = (not skip)
-
-    if quit:
-        return
-
-    if shouldMoveCloser:
-        appendParenTrail(result)
-
-    handleCursorDelta(result)
-
-    if atIndent:
-        correctIndent(result)
-
-def processChar_paren(result, ch):
-    origCh = ch
-    result['ch'] = ch
-    processIndent_paren(result)
-
-    if result['quit']:
-        return
-    if result['process']:
-        # NOTE: the order here is important!
-        updateParenTrail(result)
-        pushChar(result)
-        updateInsertionPt(result)
-    else:
-        result['ch'] = ""
-
-    updateLine(result, origCh)
-    result['x'] = result['x'] + len(result['ch'])
-
-def formatParenTrail(result):
-    start = result['parenTrail']['start']
-    end = result['parenTrail']['end']
-
-    if start is None or end is None:
-        return
-
-    line = result['lines'][result['lineNo']]
-    newTrail = ""
-    spaceCount = 0
-    for i in range(start, end):
-        if isCloseParen(line[i]):
-            newTrail = newTrail + line[i]
-        else:
-            spaceCount = spaceCount + 1
-
-    if spaceCount > 0:
-        result['lines'][result['lineNo']] = replaceStringRange(line, start, end, newTrail)
-        end = end - spaceCount
-
-    if result['insert']['lineNo'] == result['lineNo']:
-        result['insert']['x'] = end
-
-def processLine_paren(result, line):
-    result['lineNo'] = result['lineNo'] + 1
-    result['backup'] = []
-    result['cursorInComment'] = False
-    result['parenTrail'] = {'start': None, 'end': None}
-    result['trackIndent'] = (not isInStr(result['stack']))
-    result['lines'].append(line)
-    result['x'] = 0
-    result['indentDelta'] = 0
+    if result['mode'] == INDENT_MODE:
+        result['trackingIndent'] = (len(result['parenStack']) != 0 and
+                                    not result['isInStr'])
+    elif result['mode'] == PAREN_MODE:
+        result['trackingIndent'] = not result['isInStr']
 
     chars = line + NEWLINE
-    for ch in chars:
-        processChar_paren(result, ch)
-        if result['quit']:
-            break
+    for i in len(chars):
+        processChar(result, chars[i])
 
-    if not result['quit']:
-        formatParenTrail(result)
+    if result['lineNo'] == result['parenTrail']['lineNo']:
+        finishNewParenTrail(result)
 
-def finalizeResult_paren(result):
-    result['success'] = (len(result['stack']) == 0 and
-                         not result['quoteDanger'])
+def finalizeResult(result):
+    # TODO: write me
+    return None
 
-def processText_paren(text, options):
-    result = initialResult()
+def processError(result, e):
+    result['success'] = False
+    if e['parinferError']:
+        del e['parinferError']
+        result['error'] = e
+    else:
+        result['error']['name'] = ERROR_UNHANDLED
+        result['error']['message'] = e['stack']
 
-    if isinstance(options, dict):
-        if 'cursorDx' in options:
-            result['cursorDx'] = options['cursorDx']
-        if 'cursorLine' in options:
-            result['cursorLine'] = options['cursorLine']
-        if 'cursorX' in options:
-            result['cursorX'] = options['cursorX']
+def processText(text, options, mode):
+    # TODO: write me
+    return None
 
-    lines = text.split(NEWLINE)
-    for line in lines:
-        processLine_paren(result, line)
-        if result['quit']:
-            break
+#-------------------------------------------------------------------------------
+# Public API Helpers
+#-------------------------------------------------------------------------------
 
-    finalizeResult_paren(result)
-    return result
+def getChangedLines(result):
+    changedLines = []
+    for i in len(result['lines']):
+        if result['lines'][i] != result['origLines'][i]:
+            changedLines.append({
+                'lineNo': i,
+                'line': result['lines'][i],
+            })
+    return changedLines
 
+def publicResult(result):
+    if not result['success']:
+        return {
+            'text': result['origText'],
+            'success': False,
+            'error': result['error'],
+        }
 
-def formatText_paren(text, options):
-    result = processText_paren(text, options)
-    outText = text
-    if result['success']:
-        outText = NEWLINE.join(result['lines'])
+    lineEnding = getLineEnding(result['origText'])
     return {
-        'text': outText,
-        'success': result['success'],
+        'text': lineEnding.join(result['lines']),
+        'success': True,
+        'changedLines': getChangedLines(result),
     }
 
 #-------------------------------------------------------------------------------
 # Public API
 #-------------------------------------------------------------------------------
 
+def indent_mode(text, options):
+    result = processText(text, options, INDENT_MODE)
+    return publicResult(result)
 
-def indent_mode(in_text, options):
-    return formatText(in_text, options)
-
-
-def paren_mode(in_text, options):
-    return formatText_paren(in_text, options)
+def paren_mode(text, options):
+    result = processText(text, options, PAREN_MODE)
+    return publicResult(result)
