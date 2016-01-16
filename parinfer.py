@@ -74,6 +74,7 @@ def initialResult(text, options, mode):
         'isEscaping': False,
         'isInStr': False,
         'isInComment': False,
+        'commentX': None,
         'quoteDanger': False,
         'trackingIndent': False,
         'skipChar': False,
@@ -150,7 +151,7 @@ def removeWithinString(orig, start, end):
 
 def multiplyString(text, n):
     result = ""
-    for i in range(0, n):
+    for i in range(n):
         result = result + text
     return result
 
@@ -369,7 +370,8 @@ def truncateParenTrailBounds(result):
             if isCloseParen(line[i]):
                 removeCount = removeCount + 1
 
-        result['parenTrail']['openers'] = result['parenTrail']['openers'][:removeCount]
+        for i in range(removeCount):
+            result['parenTrail']['openers'].pop(0)
         result['parenTrail']['startX'] = newStartX
         result['parenTrail']['endX'] = newEndX
 
@@ -577,7 +579,7 @@ def processText(text, options, mode):
 
 def getChangedLines(result):
     changedLines = []
-    for i in range(0, len(result['lines'])):
+    for i in range(len(result['lines'])):
         if result['lines'][i] != result['origLines'][i]:
             changedLines.append({
                 'lineNo': i,
