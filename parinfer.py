@@ -1,5 +1,5 @@
 ## Parinfer.py - a Parinfer implementation in Python
-## v0.5.0
+## v0.6.0
 ## https://github.com/oakmac/parinfer.py
 ##
 ## More information about Parinfer can be found here:
@@ -19,7 +19,8 @@ INDENT_MODE = 'INDENT_MODE'
 PAREN_MODE = 'PAREN_MODE'
 
 BACKSLASH = '\\'
-COMMA = ','
+BLANK_SPACE = ' '
+DOUBLE_SPACE = '  '
 DOUBLE_QUOTE = '"'
 NEWLINE = '\n'
 SEMICOLON = ';'
@@ -149,7 +150,7 @@ def replaceWithinString(orig, start, end, replace):
 def removeWithinString(orig, start, end):
     return orig[:start] + orig[end:]
 
-def multiplyString(text, n):
+def repeatString(text, n):
     result = ""
     for i in range(n):
         result = result + text
@@ -248,7 +249,7 @@ def onCloseParen(result):
 
 def onTab(result):
     if result['isInCode']:
-        result['ch'] = '  '
+        result['ch'] = DOUBLE_SPACE
 
 def onSemicolon(result):
     if result['isInCode']:
@@ -343,8 +344,8 @@ def updateParenTrailBounds(result):
     shouldReset = (result['isInCode'] and
                    not isCloseParen(ch) and
                    ch != "" and
-                   (ch != " " or prevCh == BACKSLASH) and
-                   ch != "  ")
+                   (ch != BLANK_SPACE or prevCh == BACKSLASH) and
+                   ch != DOUBLE_SPACE)
 
     if shouldReset:
         result['parenTrail']['lineNo'] = result['lineNo']
@@ -434,7 +435,8 @@ def finishNewParenTrail(result):
         truncateParenTrailBounds(result)
         removeParenTrail(result)
     elif result['mode'] == PAREN_MODE:
-        cleanParenTrail(result)
+        if result['lineNo'] != result['cursorLine']:
+            cleanParenTrail(result)
 
 #-------------------------------------------------------------------------------
 # Indentation functions
@@ -454,7 +456,7 @@ def correctIndent(result):
     newIndent = clamp(newIndent, minIndent, maxIndent)
 
     if newIndent != origIndent:
-        indentStr = multiplyString(" ", newIndent)
+        indentStr = repeatString(BLANK_SPACE, newIndent)
         replaceWithinLine(result, result['lineNo'], 0, origIndent, indentStr)
         result['x'] = newIndent
         result['indentDelta'] = result['indentDelta'] + newIndent - origIndent
@@ -505,7 +507,7 @@ def processChar(result, ch):
     if result['mode'] == PAREN_MODE:
         handleCursorDelta(result)
 
-    if result['trackingIndent'] and ch != " " and ch != TAB:
+    if result['trackingIndent'] and ch != BLANK_SPACE and ch != TAB:
         onIndent(result)
 
     if result['skipChar']:
