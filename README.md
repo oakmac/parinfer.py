@@ -1,4 +1,4 @@
-# Parinfer for Python
+# Parinfer for Python [![Build Status](https://travis-ci.org/oakmac/parinfer.py.svg?branch=master)](https://travis-ci.org/oakmac/parinfer.py)
 
 A [Parinfer] implementation written in Python.
 
