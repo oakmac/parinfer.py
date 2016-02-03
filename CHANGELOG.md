@@ -1,3 +1,6 @@
+## 0.7.0 - 2016-02-03
+* Performance improvements
+
 ## 0.6.1 - 2016-02-02
 * Minor - update naming to match parinfer.js
 

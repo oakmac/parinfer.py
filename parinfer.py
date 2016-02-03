@@ -1,5 +1,5 @@
 ## Parinfer.py - a Parinfer implementation in Python
-## v0.6.1
+## v0.7.0
 ## https://github.com/oakmac/parinfer.py
 ##
 ## More information about Parinfer can be found here:
@@ -28,6 +28,8 @@ TAB = '\t'
 
 LINE_ENDING_REGEX = re.compile(r"\r?\n")
 
+CLOSE_PARENS = frozenset(['}', ')', ']'])
+
 PARENS = {
     '{': '}',
     '}': '{',
@@ -36,16 +38,6 @@ PARENS = {
     '(': ')',
     ')': '(',
 }
-
-#-------------------------------------------------------------------------------
-# Misc
-#-------------------------------------------------------------------------------
-
-def isOpenParen(c):
-    return c == "{" or c == "(" or c == "["
-
-def isCloseParen(c):
-    return c == "}" or c == ")" or c == "]"
 
 #-------------------------------------------------------------------------------
 # Result Structure
@@ -199,12 +191,12 @@ def commitChar(result, origCh):
 # Misc Utils
 #-------------------------------------------------------------------------------
 
-def clamp(val, minN, maxN):
+def clamp(valN, minN, maxN):
     if minN is not None:
-        val = max(minN, val)
+        valN = max(minN, valN)
     if maxN is not None:
-        val = min(maxN, val)
-    return val
+        valN = min(maxN, valN)
+    return valN
 
 def peek(arr):
     arrLen = len(arr)
@@ -283,24 +275,31 @@ def afterBackslash(result):
             raise ParinferError(err)
         onNewLine(result)
 
+CHAR_DISPATCH = {
+    '(': onOpenParen,
+    '{': onOpenParen,
+    '[': onOpenParen,
+
+    ')': onCloseParen,
+    '}': onCloseParen,
+    ']': onCloseParen,
+
+    DOUBLE_QUOTE: onQuote,
+    SEMICOLON: onSemicolon,
+    BACKSLASH: onBackslash,
+    TAB: onTab,
+    NEWLINE: onNewLine,
+}
+
 def onChar(result):
     ch = result['ch']
+
     if result['isEscaping']:
         afterBackslash(result)
-    elif isOpenParen(ch):
-        onOpenParen(result)
-    elif isCloseParen(ch):
-        onCloseParen(result)
-    elif ch == DOUBLE_QUOTE:
-        onQuote(result)
-    elif ch == SEMICOLON:
-        onSemicolon(result)
-    elif ch == BACKSLASH:
-        onBackslash(result)
-    elif ch == TAB:
-        onTab(result)
-    elif ch == NEWLINE:
-        onNewLine(result)
+    else:
+        charFn = CHAR_DISPATCH.get(ch, None)
+        if charFn is not None:
+            charFn(result)
 
     result['isInCode'] = (not result['isInComment'] and not result['isInStr'])
 
@@ -342,8 +341,8 @@ def updateParenTrailBounds(result):
     ch = result['ch']
 
     shouldReset = (result['isInCode'] and
-                   not isCloseParen(ch) and
                    ch != "" and
+                   ch not in CLOSE_PARENS and
                    (ch != BLANK_SPACE or prevCh == BACKSLASH) and
                    ch != DOUBLE_SPACE)
 
@@ -368,7 +367,7 @@ def clampParenTrailToCursor(result):
         line = result['lines'][result['lineNo']]
         removeCount = 0
         for i in range(startX, newStartX):
-            if isCloseParen(line[i]):
+            if line[i] in CLOSE_PARENS:
                 removeCount = removeCount + 1
 
         for i in range(removeCount):
@@ -413,7 +412,7 @@ def cleanParenTrail(result):
     newTrail = ""
     spaceCount = 0
     for i in range(startX, endX):
-        if isCloseParen(line[i]):
+        if line[i] in CLOSE_PARENS:
             newTrail = newTrail + line[i]
         else:
             spaceCount = spaceCount + 1
@@ -486,7 +485,7 @@ def onLeadingCloseParen(result):
                 appendParenTrail(result)
 
 def onIndent(result):
-    if isCloseParen(result['ch']):
+    if result['ch'] in CLOSE_PARENS:
         onLeadingCloseParen(result)
     elif result['ch'] == SEMICOLON:
         # comments don't count as indentation points
