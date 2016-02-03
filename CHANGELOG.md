@@ -1,3 +1,6 @@
+## 0.6.1 - 2016-02-02
+* Minor - update naming to match parinfer.js
+
 ## 0.6.0 - 2016-01-19
 * Update test files from upstream
 * Add latest changes from parinfer.js
