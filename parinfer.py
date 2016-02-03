@@ -354,14 +354,14 @@ def updateParenTrailBounds(result):
         result['parenTrail']['openers'] = []
         result['maxIndent'] = None
 
-def truncateParenTrailBounds(result):
+def clampParenTrailToCursor(result):
     startX = result['parenTrail']['startX']
     endX = result['parenTrail']['endX']
 
-    isCursorBlocking = (isCursorOnRight(result, startX) and
+    isCursorClamping = (isCursorOnRight(result, startX) and
                         not isCursorInComment(result))
 
-    if isCursorBlocking:
+    if isCursorClamping:
         newStartX = max(startX, result['cursorX'])
         newEndX = max(endX, result['cursorX'])
 
@@ -432,7 +432,7 @@ def appendParenTrail(result):
 
 def finishNewParenTrail(result):
     if result['mode'] == INDENT_MODE:
-        truncateParenTrailBounds(result)
+        clampParenTrailToCursor(result)
         removeParenTrail(result)
     elif result['mode'] == PAREN_MODE:
         if result['lineNo'] != result['cursorLine']:
