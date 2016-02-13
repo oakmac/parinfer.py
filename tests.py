@@ -66,5 +66,17 @@ class TestParinfer(unittest2.TestCase):
         self.check_error('paren', '; "foo', "quote-danger", 0, 2)
         self.check_error('paren', '(foo \\', "eol-backslash", 0, 5)
 
+    def check_changed_lines(self, mode, text, changed_lines):
+        result = modeFn[mode](text, None)
+        self.assertEqual(result['changedLines'], changed_lines)
+
+    def test_changed_lines(self):
+        self.check_changed_lines('indent', "(foo\nbar", [{'lineNo': 0, 'line': '(foo)'}])
+        self.check_changed_lines('indent', "(foo\nbar)", [{'lineNo': 0, 'line': '(foo)'},
+                                                     {'lineNo': 1, 'line': 'bar'}])
+        self.check_changed_lines('paren', "(foo\nbar)", [{'lineNo': 1, 'line': ' bar)'}])
+        self.check_changed_lines('paren', "(foo]\nbar)", [{'lineNo': 0, 'line': '(foo'},
+                                                     {'lineNo': 1, 'line': ' bar)'}])
+
 if __name__ == "__main__":
     unittest2.main()
