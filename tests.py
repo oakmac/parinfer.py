@@ -52,5 +52,19 @@ class TestParinfer(unittest2.TestCase):
         for test in PAREN_MODE_TESTS:
             self.run_test(test, "paren")
 
+    def check_error(self, mode, text, error_name, line_no, x):
+        result = modeFn[mode](text, None);
+        self.assertEqual(result['success'], False)
+        self.assertEqual(result['error']['name'], error_name)
+        self.assertEqual(result['error']['lineNo'], line_no)
+        self.assertEqual(result['error']['x'], x)
+
+    def test_errors(self):
+        self.check_error('indent', '(foo"', "unclosed-quote", 0, 4)
+        self.check_error('paren', '(foo"', "unclosed-quote", 0, 4)
+        self.check_error('paren', '(foo', "unclosed-paren", 0, 0)
+        self.check_error('paren', '; "foo', "quote-danger", 0, 2)
+        self.check_error('paren', '(foo \\', "eol-backslash", 0, 5)
+
 if __name__ == "__main__":
     unittest2.main()
