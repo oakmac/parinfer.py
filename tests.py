@@ -7,9 +7,9 @@ import unittest2
 from parinfer import indent_mode, paren_mode
 
 # load test files
-with open('./tests/indent-mode.json') as indent_mode_tests_json:
+with open('./tests/cases/indent-mode.json') as indent_mode_tests_json:
     INDENT_MODE_TESTS = json.load(indent_mode_tests_json)
-with open('./tests/paren-mode.json') as paren_mode_tests_json:
+with open('./tests/cases/paren-mode.json') as paren_mode_tests_json:
     PAREN_MODE_TESTS = json.load(paren_mode_tests_json)
 
 modeFn = {
@@ -25,13 +25,13 @@ oppositeModeFn = {
 class TestParinfer(unittest2.TestCase):
 
     def run_test(self, test, mode):
-        test_id = test['in']['fileLineNo']
-        in_text = '\n'.join(test['in']['lines'])
-        expected_text = '\n'.join(test['out']['lines'])
+        test_id = test['source']['lineNo']
+        in_text = test['text']
+        expected_text = test['result']['text']
 
         options = None
-        if isinstance(test['in']['cursor'], dict):
-            options = test['in']['cursor']
+        if isinstance(test['options'], dict):
+            options = test['options']
 
         with self.subTest(test_id):
             out_text = modeFn[mode](in_text, options)['text']

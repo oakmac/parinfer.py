@@ -1,25 +1,34 @@
 import cProfile
+import os
 import time
+
 from parinfer import indent_mode, paren_mode
 
-def timeProcess(string, options):
-  numlines = len(string.splitlines())
-  print "Testing file with", numlines, "lines"
+def timeProcess(name, string, options):
+    numlines = len(string.splitlines())
+    numchars = len(string)
+    print("Processing", name, ":", numlines, "lines", numchars, "chars")
 
-  t = time.clock()
-  indent_mode(string, options)
-  dt = time.clock() - t
-  print "Indent Mode:", dt, "s"
+    t = time.perf_counter()
+    indent_mode(string, options)
+    dt = (time.perf_counter() - t) * 1000
+    print("indent:", '{:.3f}'.format(dt), "ms")
 
-  t = time.clock()
-  paren_mode(string, options)
-  dt = time.clock() - t
-  print "Paren Mode:", dt, "s"
+    t = time.perf_counter()
+    paren_mode(string, options)
+    dt = (time.perf_counter() - t) * 1000
+    print("paren:", '{:.3f}'.format(dt), "ms")
 
-  cProfile.runctx("indent_mode(string, options)", globals(), locals())
-  cProfile.runctx("paren_mode(string, options)", globals(), locals())
+    print()
 
-with open('tests/really_long_file', 'r') as f:
-    text = f.read()
+    # cProfile.runctx("indent_mode(string, options)", globals(), locals())
+    # cProfile.runctx("paren_mode(string, options)", globals(), locals())
 
-timeProcess(text, {})
+perfDir = 'tests/perf'
+for file in os.listdir(perfDir):
+    with open(os.path.join(perfDir, file), 'r') as f:
+        text = f.read()
+    if text:
+        timeProcess(file, text, {})
+    else:
+        print("error: could not open:",file)
