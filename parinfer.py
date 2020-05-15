@@ -10,6 +10,7 @@
 ## https://github.com/oakmac/parinfer.py/blob/master/LICENSE.md
 
 import re
+import sys
 
 #-------------------------------------------------------------------------------
 # Constants
@@ -32,7 +33,7 @@ LINE_ENDING_REGEX = re.compile(r"\r?\n")
 
 # CLOSE_PARENS = frozenset(['}', ')', ']'])
 
-PARENS = {
+MATCH_PAREN = {
     '{': '}',
     '}': '{',
     '[': ']',
@@ -43,15 +44,6 @@ PARENS = {
 
 # toggle this to check the asserts during development
 RUN_ASSERTS = True #False
-
-def isBoolean(x):
-    return isinstance(x, bool)
-
-def isArray(x):
-    return isinstance(x, list)
-
-def isInteger(x):
-    return isinstance(x, int)
 
 #-------------------------------------------------------------------------------
 # Options Structure
@@ -99,7 +91,7 @@ def transformChange(change):
     }
 
 def transformChanges(changes):
-    if changes.length == 0:
+    if len(changes) == 0:
         return None
 
     lines = {}
@@ -113,20 +105,6 @@ def transformChanges(changes):
 
     return lines
 
-def parseOptions(options):
-    options = options or {}
-    return {
-        'cursorX': options.cursorX,
-        'cursorLine': options.cursorLine,
-        'prevCursorX': options.prevCursorX,
-        'prevCursorLine': options.prevCursorLine,
-        'selectionStartLine': options.selectionStartLine,
-        'changes': options.changes,
-        'partialResult': options.partialResult,
-        'forceBalance': options.forceBalance,
-        'returnParens': options.returnParens
-    }
-
 #-------------------------------------------------------------------------------
 # Result Structure
 #-------------------------------------------------------------------------------
@@ -135,140 +113,163 @@ def parseOptions(options):
 # of a given text, we mutate this structure to update the state of our
 # system.
 
+class Clamped(object):
+    __slots__ = ('startX', 'endX', 'openers')
+    def __init__(self):
+        self.startX = UINT_NULL       # startX before paren trail was clamped
+        self.endX = UINT_NULL         # endX before paren trail was clamped
+        self.openers = []             # openers that were cut out after paren trail was clamped
+
+class ParenTrail(object):
+    __slots__ = ('lineNo', 'startX', 'endX', 'openers', 'clamped')
+    def __init__(self):
+        self.lineNo = UINT_NULL       # [integer] - line number of the last parsed paren trail
+        self.startX = UINT_NULL       # [integer] - x position of first paren in this range
+        self.endX = UINT_NULL         # [integer] - x position after the last paren in this range
+        self.openers = []             # [array of stack elements] - corresponding open-paren for each close-paren in this range
+        self.clamped = Clamped()
+
 def initialParenTrail():
-    return {
-        'lineNo': UINT_NULL,        # [integer] - line number of the last parsed paren trail
-        'startX': UINT_NULL,        # [integer] - x position of first paren in this range
-        'endX': UINT_NULL,          # [integer] - x position after the last paren in this range
-        'openers': [],              # [array of stack elements] - corresponding open-paren for each close-paren in this range
-        'clamped': {
-            'startX': UINT_NULL,    # startX before paren trail was clamped
-            'endX': UINT_NULL,      # endX before paren trail was clamped
-            'openers': []           # openers that were cut out after paren trail was clamped
-        }
-    }
+    return ParenTrail()
 
-def initialResult(text, options, mode, smart):
+class Result(object):
     """Returns a dictionary of the initial state."""
+    __slots__ = ('mode', 'smart',
+        'origText', 'origCursorX', 'origCursorLine',
+        'inputLines',
+        'inputLineNo', 'inputX',
+        'lines', 'lineNo', 'ch', 'x', 'indentX',
+        'parenStack',
+        'tabStops', 'parenTrail',
+        'parenTrails',
+        'returnParens', 'parens',
+        'cursorX', 'cursorLine', 'prevCursorX', 'prevCursorLine',
+        'selectionStartLine',
+        'changes',
+        'isInCode', 'isEscaping', 'isEscaped', 'isInStr', 'isInComment',
+        'commentX',
+        'quoteDanger', 'trackingIndent', 'skipChar', 'success', 'partialResult',
+        'forceBalance', 'maxIndent', 'indentDelta', 'trackingArgTabStop',
+        'error',
+        'errorPosCache')
 
-    result = {
 
-        'mode': mode,                # [enum] - current processing mode (INDENT_MODE or PAREN_MODE)
-        'smart': smart,              # [boolean] - smart mode attempts special user-friendly behavior
+    def __init__(self, text, options, mode, smart):
+        super(Result, self).__init__()
 
-        'origText': text,            # [string] - original text
-        'origCursorX': UINT_NULL,    # [integer] - original cursorX option
-        'origCursorLine': UINT_NULL, # [integer] - original cursorLine option
+        self.mode = mode                # [enum] - current processing mode (INDENT_MODE or PAREN_MODE)
+        self.smart = smart              # [boolean] - smart mode attempts special user-friendly behavior
 
-        'inputLines':                # [string array] - input lines that we process line-by-line, char-by-char
-          text.split(LINE_ENDING_REGEX),
-        'inputLineNo': -1,           # [integer] - the current input line number
-        'inputX': -1,                # [integer] - the current input x position of the current character (ch)
+        self.origText = text            # [string] - original text
+        self.origCursorX = UINT_NULL    # [integer] - original cursorX option
+        self.origCursorLine = UINT_NULL # [integer] - original cursorLine option
 
-        'lines': [],                 # [string array] - output lines (with corrected parens or indentation)
-        'lineNo': -1,                # [integer] - output line number we are on
-        'ch': "",                    # [string] - character we are processing (can be changed to indicate a replacement)
-        'x': 0,                      # [integer] - output x position of the current character (ch)
-        'indentX': UINT_NULL,        # [integer] - x position of the indentation point if present
+                                        # [string array] - input lines that we process line-by-line char-by-char
+        self.inputLines = re.split(LINE_ENDING_REGEX, text)
+        
+        self.inputLineNo = -1           # [integer] - the current input line number
+        self.inputX: -1                 # [integer] - the current input x position of the current character (ch)
 
-        'parenStack': [],            # We track where we are in the Lisp tree by keeping a stack (array) of open-parens.
-                                     # Stack elements are objects containing keys {ch, x, lineNo, indentDelta}
-                                     # whose values are the same as those described here in this result structure.
+        self.lines = []                 # [string array] - output lines (with corrected parens or indentation)
+        self.lineNo = -1                # [integer] - output line number we are on
+        self.ch = ''                    # [string] - character we are processing (can be changed to indicate a replacement)
+        self.x = 0                      # [integer] - output x position of the current character (ch)
+        self.indentX = UINT_NULL        # [integer] - x position of the indentation point if present
 
-        'tabStops': [],              # In Indent Mode, it is useful for editors to snap a line's indentation
-                                     # to certain critical points.  Thus, we have a `tabStops` array of objects containing
-                                     # keys {ch, x, lineNo, argX}, which is just the state of the `parenStack` at the cursor line.
+        self.parenStack = []            # We track where we are in the Lisp tree by keeping a stack (array) of open-parens.
+                                        # Stack elements are objects containing keys {ch, x, lineNo, indentDelta}
+                                        # whose values are the same as those described here in this result structure.
 
-        'parenTrail': initialParenTrail(), # the range of parens at the end of a line
+        self.tabStops = []              # In Indent Mode, it is useful for editors to snap a line's indentation
+                                        # to certain critical points.  Thus, we have a `tabStops` array of objects containing
+                                        # keys {ch, x, lineNo, argX}, which is just the state of the `parenStack` at the cursor line.
 
-        'parenTrails': [],           # [array of {lineNo, startX, endX}] - all non-empty parenTrails to be returned
+        self.parenTrail = initialParenTrail() # the range of parens at the end of a line
 
-        'returnParens': False,       # [boolean] - determines if we return `parens` described below
-        'parens': [],                # [array of {lineNo, x, closer, children}] - paren tree if `returnParens` is h
+        self.parenTrails = []           # [array of {lineNo, startX, endX}] - all non-empty parenTrails to be returned
 
-        'cursorX': UINT_NULL,        # [integer] - x position of the cursor
-        'cursorLine': UINT_NULL,     # [integer] - line number of the cursor
-        'prevCursorX': UINT_NULL,    # [integer] - x position of the previous cursor
-        'prevCursorLine': UINT_NULL, # [integer] - line number of the previous cursor
+        self.returnParens = False       # [boolean] - determines if we return `parens` described below
+        self.parens = []                # [array of {lineNo, x, closer, children}] - paren tree if `returnParens` is h
 
-        'selectionStartLine': UINT_NULL, # [integer] - line number of the current selection starting point
+        self.cursorX = UINT_NULL        # [integer] - x position of the cursor
+        self.cursorLine = UINT_NULL     # [integer] - line number of the cursor
+        self.prevCursorX = UINT_NULL    # [integer] - x position of the previous cursor
+        self.prevCursorLine = UINT_NULL # [integer] - line number of the previous cursor
 
-        'changes': None,             # [object] - mapping change.key to a change object (please see `transformChange` for object structure)
+        self.selectionStartLine = UINT_NULL # [integer] - line number of the current selection starting point
 
-        'isInCode': True,            # [boolean] - indicates if we are currently in "code space" (not string or comment)
-        'isEscaping': False,         # [boolean] - indicates if the next character will be escaped (e.g. `\c`).  This may be inside string, comment, or code.
-        'isEscaped': False,          # [boolean] - indicates if the current character is escaped (e.g. `\c`).  This may be inside string, comment, or code.
-        'isInStr': False,            # [boolean] - indicates if we are currently inside a string
-        'isInComment': False,        # [boolean] - indicates if we are currently inside a comment
-        'commentX': UINT_NULL,       # [integer] - x position of the start of comment on current line (if any)
+        self.changes = None             # [object] - mapping change.key to a change object (please see `transformChange` for object structure)
 
-        'quoteDanger': False,        # [boolean] - indicates if quotes are imbalanced inside of a comment (dangerous)
-        'trackingIndent': False,     # [boolean] - are we looking for the indentation point of the current line?
-        'skipChar': False,           # [boolean] - should we skip the processing of the current character?
-        'success': False,            # [boolean] - was the input properly formatted enough to create a valid result?
-        'partialResult': False,      # [boolean] - should we return a partial result when an error occurs?
-        'forceBalance': False,       # [boolean] - should indent mode aggressively enforce paren balance?
+        self.isInCode = True            # [boolean] - indicates if we are currently in "code space" (not string or comment)
+        self.isEscaping = False         # [boolean] - indicates if the next character will be escaped (e.g. `\c`).  This may be inside string comment or code.
+        self.isEscaped = False          # [boolean] - indicates if the current character is escaped (e.g. `\c`).  This may be inside string comment or code.
+        self.isInStr = False            # [boolean] - indicates if we are currently inside a string
+        self.isInComment = False        # [boolean] - indicates if we are currently inside a comment
+        self.commentX = UINT_NULL       # [integer] - x position of the start of comment on current line (if any)
 
-        'maxIndent': UINT_NULL,      # [integer] - maximum allowed indentation of subsequent lines in Paren Mode
-        'indentDelta': 0,            # [integer] - how far indentation was shifted by Paren Mode
-                                     #  (preserves relative indentation of nested expressions)
+        self.quoteDanger = False        # [boolean] - indicates if quotes are imbalanced inside of a comment (dangerous)
+        self.trackingIndent = False     # [boolean] - are we looking for the indentation point of the current line?
+        self.skipChar = False           # [boolean] - should we skip the processing of the current character?
+        self.success = False            # [boolean] - was the input properly formatted enough to create a valid result?
+        self.partialResult = False      # [boolean] - should we return a partial result when an error occurs?
+        self.forceBalance = False       # [boolean] - should indent mode aggressively enforce paren balance?
 
-        'trackingArgTabStop': None,  # [string] - enum to track how close we are to the first-arg tabStop in a list
-                                     #  For example a tabStop occurs at `bar` below:
-                                     #
-                                     #         `   (foo    bar`
-                                     #          00011112222000  <-- state after processing char (enums below)
-                                     #
-                                     #         0   None    => not searching
-                                     #         1   'space' => searching for next space
-                                     #         2   'arg'   => searching for arg
-                                     #
-                                     #    (We create the tabStop when the change from 2->0 happens.)
-                                     #
+        self.maxIndent = UINT_NULL      # [integer] - maximum allowed indentation of subsequent lines in Paren Mode
+        self.indentDelta = 0            # [integer] - how far indentation was shifted by Paren Mode
+                                        #  (preserves relative indentation of nested expressions)
 
-        'error': {                   # if 'success' is False, return this error to the user
-            'name': None,            # [string] - Parinfer's unique name for this error
-            'message': None,         # [string] - error message to display
-            'lineNo': None,          # [integer] - line number of error
-            'x': None,               # [integer] - start x position of error
+        self.trackingArgTabStop = None  # [string] - enum to track how close we are to the first-arg tabStop in a list
+                                        #  For example a tabStop occurs at `bar` below:
+                                        #
+                                        #         `   (foo    bar`
+                                        #          00011112222000  <-- state after processing char (enums below)
+                                        #
+                                        #         0   None    => not searching
+                                        #         1   'space' => searching for next space
+                                        #         2   'arg'   => searching for arg
+                                        #
+                                        #    (We create the tabStop when the change from 2->0 happens.)
+                                        #
+
+        self.error = {                  # if 'success' is False, return this error to the user
+            'name': None,               # [string] - Parinfer's unique name for this error
+            'message': None,            # [string] - error message to display
+            'lineNo': None,             # [integer] - line number of error
+            'x': None,                  # [integer] - start x position of error
             'extra': {
                 'name': None,
                 'lineNo': None,
                 'x': None
             }
-        },
-        'errorPosCache': {}          # [object] - maps error name to a potential error position
-    }
+        }
+        self.errorPosCache = {}         # [object] - maps error name to a potential error position
 
-    # Make sure no new properties are added to the result, for type safety.
-    # (uncomment only when debugging, since it incurs a perf penalty)
-    # Object.preventExtensions(result)
-    # Object.preventExtensions(result.parenTrail)
+        if isinstance(options, dict):
+            if 'cursorDx' in options:
+                self.cursorDx = options['cursorDx']
+                self.origCursorX = options['cursorDx']
+            if 'cursorLine' in options:
+                self.cursorLine = options['cursorLine']
+                self.origCursorLine     = options['cursorLine']
+            if 'prevCursorX' in options:
+                self.prevCursorX = options['prevCursorX']
+            if 'prevCursorLine' in options:
+                self.prevCursorLine = options['prevCursorLine']
+            if 'selectionStartLine' in options:
+                self.selectionStartLine = options['selectionStartLine']
+            if 'changes' in options:
+                self.changes = options['changes']
+            if 'partialResult' in options:
+                self.partialResult = options['partialResult']
+            if 'forceBalance' in options:
+                self.forceBalance = options['forceBalance']
+            if 'returnParens' in options:
+                self.returnParens = options['returnParens']
 
-    # merge options if they are valid
-    if options:
-        if isInteger(options.cursorX):
-            result.cursorX            = options.cursorX
-            result.origCursorX        = options.cursorX
-        if isInteger(options.cursorLine):
-            result.cursorLine         = options.cursorLine
-            result.origCursorLine     = options.cursorLine
-        if isInteger(options.prevCursorX):
-            result.prevCursorX        = options.prevCursorX
-        if isInteger(options.prevCursorLine):
-            result.prevCursorLine     = options.prevCursorLine
-        if isInteger(options.selectionStartLine):
-            result.selectionStartLine = options.selectionStartLine
-        if isArray(options.changes):
-            result.changes            = transformChanges(options.changes)
-        if isBoolean(options.partialResult):
-            result.partialResult      = options.partialResult
-        if isBoolean(options.forceBalance):
-            result.forceBalance       = options.forceBalance
-        if isBoolean(options.returnParens):
-            result.returnParens       = options.returnParens
+def getInitialResult(text, options, mode, smart):
+    """Returns a dictionary of the initial state."""
 
-    return result
+    return Result(text, options, mode, smart)
 
 #-------------------------------------------------------------------------------
 # Possible Errors
@@ -304,8 +305,16 @@ def cacheErrorPos(result, errorName):
     result.errorPosCache[errorName] = e
     return e
 
+class ParinferError(Exception):
+    pass
+
 def error(result, name):
-    cache = result.errorPosCache[name]
+    cache = {}
+    if name in result.errorPosCache:
+        cache = result.errorPosCache[name]
+
+    resultLineNo = result.LineNo if result.partialResult else result.inputLineNo
+    resultX = result.x if result.partialResult else result.inputX
 
     keyLineNo = 'lineNo' if result.partialResult else 'inputLineNo'
     keyX = 'x' if result.partialResult else 'inputX'
@@ -314,32 +323,36 @@ def error(result, name):
         'parinferError': True,
         'name': name,
         'message': errorMessages[name],
-        'lineNo': cache[keyLineNo] if cache else result[keyLineNo],
-        'x': cache[keyX] if cache else result[keyX]
+        'lineNo': cache[keyLineNo] if cache else resultLineNo,
+        'x': cache[keyX] if cache else resultX
     }
     opener = peek(result.parenStack, 0)
+
+    openerLineNo = opener.LineNo if result.partialResult else opener.inputLineNo
+    openerX = opener.x if result.partialResult else opener.inputX
 
     if name == ERROR_UNMATCHED_CLOSE_PAREN:
         # extra error info for locating the open-paren that it should've matched
         cache = result.errorPosCache[ERROR_UNMATCHED_OPEN_PAREN]
         if cache or opener:
-          e.extra = {
-            'name': ERROR_UNMATCHED_OPEN_PAREN,
-            'lineNo': cache[keyLineNo] if cache else opener[keyLineNo],
-            'x': cache[keyX] if cache else opener[keyX]
-          }
-    elif name == ERROR_UNCLOSED_PAREN:
-        e.lineNo = opener[keyLineNo]
-        e.x = opener[keyX]
 
-    return e
+            e.extra = {
+                'name': ERROR_UNMATCHED_OPEN_PAREN,
+                'lineNo': cache[keyLineNo] if cache else openerLineNo,
+                'x': cache[keyX] if cache else openerX
+            }
+    elif name == ERROR_UNCLOSED_PAREN:
+        e['lineNo'] = openerLineNo
+        e['x'] = openerX
+
+    return ParinferError(e)
 
 #-------------------------------------------------------------------------------
 # String Operations
 #-------------------------------------------------------------------------------
 
 def replaceWithinString(orig, start, end, replace):
-    return orig[0:start] + replace + orig[end:]
+    return orig[:start] + replace + orig[end:]
 
 if RUN_ASSERTS:
     assert replaceWithinString('aaa', 0, 2, '') == 'a'
@@ -375,7 +388,7 @@ def isCursorAffected(result, start, end):
 
 def shiftCursorOnEdit(result, lineNo, start, end, replace):
     oldLength = end - start
-    newLength = replace.length
+    newLength = len(replace)
     dx = newLength - oldLength
 
     if (dx != 0 and
@@ -402,9 +415,12 @@ def initLine(result):
     result.indentX = UINT_NULL
     result.commentX = UINT_NULL
     result.indentDelta = 0
-    del result.errorPosCache[ERROR_UNMATCHED_CLOSE_PAREN]
-    del result.errorPosCache[ERROR_UNMATCHED_OPEN_PAREN]
-    del result.errorPosCache[ERROR_LEADING_CLOSE_PAREN]
+    if ERROR_UNMATCHED_CLOSE_PAREN in result.errorPosCache:
+        del result.errorPosCache[ERROR_UNMATCHED_CLOSE_PAREN]
+    if ERROR_UNMATCHED_OPEN_PAREN in result.errorPosCache:
+        del result.errorPosCache[ERROR_UNMATCHED_OPEN_PAREN]
+    if ERROR_LEADING_CLOSE_PAREN in result.errorPosCache:
+        del result.errorPosCache[ERROR_LEADING_CLOSE_PAREN]
 
     result.trackingArgTabStop = None
     result.trackingIndent = not result.isInStr
@@ -413,9 +429,9 @@ def initLine(result):
 def commitChar(result, origCh):
     ch = result.ch
     if origCh != ch:
-        replaceWithinLine(result, result.lineNo, result.x, result.x + origCh.length, ch)
-        result.indentDelta -= (origCh.length - ch.length)
-    result.x += ch.length
+        replaceWithinLine(result, result.lineNo, result.x, result.x + len(origCh), ch)
+        result.indentDelta -= (len(origCh) - len(ch))
+    result.x += len(ch)
 
 #-------------------------------------------------------------------------------
 # Misc Utils
@@ -457,13 +473,14 @@ if RUN_ASSERTS:
 #-------------------------------------------------------------------------------
 
 def isOpenParen(ch):
-  return ch == "{" or ch == "(" or ch == "["
+  return ch == '{' or ch == '(' or ch == '['
 
 def isCloseParen(ch):
-  return ch == "}" or ch == ")" or ch == "]"
+  return ch == '}' or ch == ')' or ch == ']'
+  # return ch in CLOSE_PARENS
 
 def isValidCloseParen(parenStack, ch):
-    if parenStack.length == 0:
+    if len(parenStack) == 0:
         return False
     return peek(parenStack, 0).ch == MATCH_PAREN[ch]
 
@@ -475,7 +492,7 @@ def isWhitespace(result):
 def isClosable(result):
     ch = result.ch
     closer = isCloseParen(ch) and not result.isEscaped
-    return result.isInCode and not isWhitespace(result) and ch != "" and not closer
+    return result.isInCode and not isWhitespace(result) and ch != '' and not closer
 
 #-------------------------------------------------------------------------------
 # Advanced operations on characters
@@ -509,24 +526,46 @@ def trackArgTabStop(result, state):
         if not isWhitespace(result):
             opener = peek(result.parenStack, 0)
             opener.argX = result.x
-            result.trackingArgTabStop = null
+            result.trackingArgTabStop = None
 
 #-------------------------------------------------------------------------------
 # Literal character events
 #-------------------------------------------------------------------------------
 
+class Opener(object):
+    __slots__ = ('self', 'inputLineNo', 'inputX', 'lineNo', 'x', 'ch', 'indentDelta', 'maxChildIndent', 'argX')
+    def __init__(self, inputLineNo, inputX, lineNo, x, ch, indentDelta, maxChildIndent):
+        super(Opener, self).__init__()
+        self.inputLineNo = inputLineNo
+        self.inputX = inputX
+        self.lineNo = lineNo
+        self.x = x
+        self.ch = ch
+        self.indentDelta = indentDelta
+        self.maxChildIndent = maxChildIndent
+
+        # opener = {
+        #     'inputLineNo': result.inputLineNo,
+        #     'inputX': result.inputX,
+
+        #     'lineNo': result.lineNo,
+        #     'x': result.x,
+        #     'ch': result.ch,
+        #     'indentDelta': result.indentDelta,
+        #     'maxChildIndent': UINT_NULL
+        # }
+
 def onOpenParen(result):
     if result.isInCode:
-        opener = {
-            'inputLineNo': result.inputLineNo,
-            'inputX': result.inputX,
-
-            'lineNo': result.lineNo,
-            'x': result.x,
-            'ch': result.ch,
-            'indentDelta': result.indentDelta,
-            'maxChildIndent': UINT_NULL
-        }
+        opener = Opener(
+            result.inputLineNo,
+            result.inputX,
+            result.lineNo,
+            result.x,
+            result.ch,
+            result.indentDelta,
+            UINT_NULL
+        )
 
         if result.returnParens:
             opener.children = []
@@ -537,9 +576,9 @@ def onOpenParen(result):
             }
             parent = peek(result.parenStack, 0)
             parent = parent.children if parent else result.parens
-            parent.push(opener)
+            parent.append(opener)
 
-        result.parenStack.push(opener)
+        result.parenStack.append(opener)
         result.trackingArgTabStop = 'space'
 
 def setCloser(opener, lineNo, x, ch):
@@ -553,7 +592,7 @@ def onMatchedCloseParen(result):
         setCloser(opener, result.lineNo, result.x, result.ch)
 
     result.parenTrail.endX = result.x + 1
-    result.parenTrail.openers.push(opener)
+    result.parenTrail.openers.append(opener)
 
     if result.mode == INDENT_MODE and result.smart and checkCursorHolding(result):
         origStartX = result.parenTrail.startX
@@ -574,7 +613,9 @@ def onUnmatchedCloseParen(result):
         canRemove = result.smart and inLeadingParenTrail
         if not canRemove:
             raise error(result, ERROR_UNMATCHED_CLOSE_PAREN)
-    elif result.mode == INDENT_MODE and not result.errorPosCache[ERROR_UNMATCHED_CLOSE_PAREN]:
+    elif result.mode == INDENT_MODE and (
+            ERROR_UNMATCHED_CLOSE_PAREN in result.errorPosCache and
+            not result.errorPosCache[ERROR_UNMATCHED_CLOSE_PAREN]):
         cacheErrorPos(result, ERROR_UNMATCHED_CLOSE_PAREN)
         opener = peek(result.parenStack, 0)
         if opener:
@@ -636,7 +677,7 @@ def onChar(result):
     ch = result.ch
     result.isEscaped = False
 
-    if (result.isEscaping):
+    if result.isEscaping:
         afterBackslash(result)
     elif isOpenParen(ch):
         onOpenParen(result)
@@ -658,7 +699,7 @@ def onChar(result):
     result.isInCode = not result.isInComment and not result.isInStr
 
     if isClosable(result):
-        resetParenTrail(result, result.lineNo, result.x+ch.length)
+        resetParenTrail(result, result.lineNo, result.x+len(ch))
 
     state = result.trackingArgTabStop
     if (state):
@@ -750,8 +791,8 @@ def popParenTrail(result):
         return
 
     openers = result.parenTrail.openers
-    while openers.length != 0:
-        result.parenStack.push(openers.pop())
+    while len(openers) != 0:
+        result.parenStack.append(openers.pop())
 
 # Determine which open-paren (if any) on the parenStack should be considered
 # the direct parent of the current line (given its indentation point).
@@ -759,7 +800,8 @@ def popParenTrail(result):
 # behavior by adding its `opener.indentDelta` to the current line's indentation.
 # (care must be taken to prevent redundant indentation correction, detailed below)
 def getParentOpenerIndex(result, indentX):
-    for i in range(len(result.parenStack.length)):
+    i = 0
+    for i in range(len(result.parenStack)):
         opener = peek(result.parenStack, i)
 
         currOutside = (opener.x < indentX)
@@ -929,12 +971,12 @@ def getParentOpenerIndex(result, indentX):
 
 # INDENT MODE: correct paren trail from indentation
 def correctParenTrail(result, indentX):
-    parens = ""
+    parens = ''
 
     index = getParentOpenerIndex(result, indentX)
-    for i in range(0, index):
+    for i in range(index):
         opener = result.parenStack.pop()
-        result.parenTrail.openers.push(opener)
+        result.parenTrail.openers.append(opener)
         closeCh = MATCH_PAREN[opener.ch]
         parens += closeCh
 
@@ -943,7 +985,7 @@ def correctParenTrail(result, indentX):
 
     if result.parenTrail.lineNo != UINT_NULL:
         replaceWithinLine(result, result.parenTrail.lineNo, result.parenTrail.startX, result.parenTrail.endX, parens)
-        result.parenTrail.endX = result.parenTrail.startX + parens.length
+        result.parenTrail.endX = result.parenTrail.startX + len(parens)
         rememberParenTrail(result)
 
 # PAREN MODE: remove spaces from the paren trail
@@ -979,14 +1021,16 @@ def appendParenTrail(result):
     insertWithinLine(result, result.parenTrail.lineNo, result.parenTrail.endX, closeCh)
 
     result.parenTrail.endX += 1
-    result.parenTrail.openers.push(opener)
+    result.parenTrail.openers.append(opener)
     updateRememberedParenTrail(result)
 
 def invalidateParenTrail(result):
   result.parenTrail = initialParenTrail()
 
 def checkUnmatchedOutsideParenTrail(result):
-    cache = result.errorPosCache[ERROR_UNMATCHED_CLOSE_PAREN]
+    cache = None
+    if ERROR_UNMATCHED_CLOSE_PAREN in result.errorPosCache:
+        cache = result.errorPosCache[ERROR_UNMATCHED_CLOSE_PAREN]
     if cache and cache.x < result.parenTrail.startX:
         raise error(result, ERROR_UNMATCHED_CLOSE_PAREN)
 
@@ -1000,16 +1044,16 @@ def setMaxIndent(result, opener):
 
 def rememberParenTrail(result):
     trail = result.parenTrail
-    openers = trail.clamped.openers.concat(trail.openers)
-    if openers.length > 0:
+    openers = trail.clamped.openers + trail.openers
+    if len(openers) > 0:
         isClamped = trail.clamped.startX != UINT_NULL
-        allClamped = trail.openers.length == 0
+        allClamped = len(trail.openers) == 0
         shortTrail = {
             'lineNo': trail.lineNo,
             'startX': trail.clamped.startX if isClamped else trail.startX,
-            'endX': trail.clamped.endX if allClamped else trail.end,
+            'endX': trail.clamped.endX if allClamped else trail.endX,
         }
-        result.parenTrails.push(shortTrail)
+        result.parenTrails.append(shortTrail)
 
         if result.returnParens:
             for i in range(len(openers)):
@@ -1022,7 +1066,7 @@ def updateRememberedParenTrail(result):
     else:
         trail.endX = result.parenTrail.endX
         if result.returnParens:
-            opener = result.parenTrail.openers[result.parenTrail.openers.length-1]
+            opener = result.parenTrail.openers[len(result.parenTrail.openers)-1]
             opener.closer.trail = trail
 
 def finishNewParenTrail(result):
@@ -1091,7 +1135,7 @@ def onIndent(result):
         correctIndent(result)
 
 def checkLeadingCloseParen(result):
-    if (result.errorPosCache[ERROR_LEADING_CLOSE_PAREN] and
+    if (ERROR_LEADING_CLOSE_PAREN in result.errorPosCache and
             result.parenTrail.lineNo == result.lineNo):
         raise error(result, ERROR_LEADING_CLOSE_PAREN)
 
@@ -1099,7 +1143,7 @@ def onLeadingCloseParen(result):
     if result.mode == INDENT_MODE:
         if not result.forceBalance:
             if result.smart:
-                raise {leadingCloseParen: True}
+                raise ParinferError({'leadingCloseParen': True})
         if not result.errorPosCache[ERROR_LEADING_CLOSE_PAREN]:
             cacheErrorPos(result, ERROR_LEADING_CLOSE_PAREN)
         result.skipChar = True
@@ -1122,8 +1166,8 @@ def onCommentLine(result):
 
     # restore the openers matching the previous paren trail
     if result.mode == PAREN_MODE:
-        for j in range(0, parenTrailLength):
-            result.parenStack.push(peek(result.parenTrail.openers, j))
+        for j in range(parenTrailLength):
+            result.parenStack.append(peek(result.parenTrail.openers, j))
 
     i = getParentOpenerIndex(result, result.x)
     opener = peek(result.parenStack, i)
@@ -1135,7 +1179,7 @@ def onCommentLine(result):
 
     # repop the openers matching the previous paren trail
     if result.mode == PAREN_MODE:
-        for j in range(0, parenTrailLength):
+        for j in range(parenTrailLength):
             result.parenStack.pop()
 
 def checkIndent(result):
@@ -1168,14 +1212,14 @@ def setTabStops(result):
         return
 
     for i in range(len(result.parenStack)):
-        result.tabStops.push(makeTabStop(result, result.parenStack[i]))
+        result.tabStops.append(makeTabStop(result, result.parenStack[i]))
 
-    if (result.mode == PAREN_MODE):
-        for i in range(result.parenTrail.openers.length-1, -1, -1):
-            result.tabStops.push(makeTabStop(result, result.parenTrail.openers[i]))
+    if result.mode == PAREN_MODE:
+        for i in range(len(result.parenTrail.openers)-1, -1, -1):
+            result.tabStops.append(makeTabStop(result, result.parenTrail.openers[i]))
 
     # remove argX if it falls to the right of the next stop
-    for i  in range(1, len(result.tabStops)):
+    for i in range(1, len(result.tabStops)):
         x = result.tabStops[i].x
         prevArgX = result.tabStops[i-1].argX
         if prevArgX != None and prevArgX >= x:
@@ -1189,7 +1233,7 @@ def processChar(result, ch):
     origCh = ch
 
     result.ch = ch
-    result.skipChar = false
+    result.skipChar = False
 
     handleChangeDelta(result)
 
@@ -1197,7 +1241,7 @@ def processChar(result, ch):
         checkIndent(result)
 
     if result.skipChar:
-        result.ch = ""
+        result.ch = ''
     else:
         onChar(result)
 
@@ -1205,7 +1249,7 @@ def processChar(result, ch):
 
 def processLine(result, lineNo):
     initLine(result)
-    result.lines.push(result.inputLines[lineNo])
+    result.lines.append(result.inputLines[lineNo])
 
     setTabStops(result)
 
@@ -1228,7 +1272,7 @@ def finalizeResult(result):
     if result.isInStr:
         raise error(result, ERROR_UNCLOSED_QUOTE)
 
-    if result.parenStack.length != 0:
+    if len(result.parenStack) != 0:
         if result.mode == PAREN_MODE:
           raise error(result, ERROR_UNCLOSED_PAREN)
 
@@ -1240,15 +1284,15 @@ def finalizeResult(result):
 
 def processError(result, e):
     result.success = False
-    if e.parinferError:
-        del e.parinferError
+    if 'parinferError' in e:
+        del e['parinferError']
         result.error = e
     else:
         result.error.name = ERROR_UNHANDLED
         result.error.message = e.stack
         raise e
 
-def processText(text, options, mode, smart):
+def processText(text, options, mode, smart=False):
     result = getInitialResult(text, options, mode, smart)
 
     try:
@@ -1256,12 +1300,11 @@ def processText(text, options, mode, smart):
             result.inputLineNo = i
             processLine(result, i)
         finalizeResult(result)
-    except:
-        # TODO: narrow this
-        e = sys.exc_info()[0]
-        if e.leadingCloseParen or e.releaseCursorHold:
+    except ParinferError as e:
+        errorDetails = e.args[0]
+        if 'leadingCloseParen' in errorDetails or 'releaseCursorHold' in errorDetails:
             return processText(text, options, PAREN_MODE, smart)
-        processError(result, e)
+        processError(result, errorDetails)
 
     return result
 
@@ -1273,10 +1316,10 @@ def publicResult(result):
     lineEnding = getLineEnding(result.origText)
     if result.success:
         final = {
-            'text': result.lines.join(lineEnding),
+            'text': lineEnding.join(result.lines),
             'cursorX': result.cursorX,
             'cursorLine': result.cursorLine,
-            'success': true,
+            'success': True,
             'tabStops': result.tabStops,
             'parenTrails': result.parenTrails
         }
@@ -1284,39 +1327,38 @@ def publicResult(result):
             final.parens = result.parens
     else:
         final = {
-            'text': result.lines.join(lineEnding) if result.partialResult else result.origText,
+            'text': lineEnding.join(result.lines) if result.partialResult else result.origText,
             'cursorX': result.cursorX if result.partialResult else result.origCursorX,
             'cursorLine': result.cursorLine if result.partialResult else result.origCursorLine,
             'parenTrails': result.parenTrails if result.partialResult else None,
-            'success': false,
+            'success': False,
             'error': result.error
         }
         if result.partialResult and result.returnParens:
             final.parens = result.parens
 
-    if final.cursorX == UINT_NULL:
-        del final.cursorX
-    if final.cursorLine == UINT_NULL:
-        del final.cursorLine
-    if final.tabStops and final.tabStops.length == 0:
-        del final.tabStops
+    if final['cursorX'] == UINT_NULL:
+        del final['cursorX']
+    if final['cursorLine'] == UINT_NULL:
+        del final['cursorLine']
+    if 'tabStops' in final and len(final['tabStops']) == 0:
+        del final['tabStops']
     return final
 
 def indent_mode(text, options):
-    options = parseOptions(options)
     return publicResult(processText(text, options, INDENT_MODE))
 
 def paren_mode(text, options):
-    options = parseOptions(options)
     return publicResult(processText(text, options, PAREN_MODE))
 
 def smart_mode(text, options):
-    options = parseOptions(options)
-    smart = options.selectionStartLine == None
+    smart = False
+    if isinstance(options, dict) and 'selectionStartLine' in options:
+        smart = options['selectionStartLine'] == None
     return publicResult(processText(text, options, INDENT_MODE, smart))
 
 API = {
-    'version': "3.12.0",
+    'version': '3.12.0',
     'indent_mode': indent_mode,
     'paren_mode': paren_mode,
     'smart_mode': smart_mode
