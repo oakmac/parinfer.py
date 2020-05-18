@@ -44,17 +44,20 @@ class TestParinfer(unittest.TestCase):
             out_text = out['text']
 
             if expected_error:
+                # print("result", out)
+                # print("expected_error", expected_error)
                 self.assert_error(out, expected_error['name'],
                     expected_error['lineNo'], expected_error['x'])
                 # self.check_error()
-                # print("result", out)
-                # print("expected_error", expected_error)
                 # self.assertEqual(out['error'], expected_error)
             else:
                 self.assertEqual(out_text, expected_text)
+                # print("passed first")
 
-                out_text2 = modeFn[mode](out_text, options)['text']
-                self.assertEqual(out_text2, expected_text, "idempotence")
+                if options is None:
+                    # TODO: The presence of cursors changes idempotence of the operation?
+                    out_text2 = modeFn[mode](out_text, None)['text']
+                    self.assertEqual(out_text2, expected_text, "idempotence")
 
                 if options is None:
                     out_text3 = oppositeModeFn[mode](out_text, options)['text']
@@ -62,13 +65,17 @@ class TestParinfer(unittest.TestCase):
 
     def test_indent_mode(self):
         for test in INDENT_MODE_TESTS:
-            # if test['source']['lineNo'] == 118:
-                # print("test is",test)
             self.run_test(test, "indent")
+            # if test['source']['lineNo'] == 574:
+                # print("test is",test)
+                # self.run_test(test, "indent")
 
-    # def test_paren_mode(self):
-    #     for test in PAREN_MODE_TESTS:
-    #         self.run_test(test, "paren")
+    def test_paren_mode(self):
+        for test in PAREN_MODE_TESTS:
+            self.run_test(test, "paren")
+            # if test['source']['lineNo'] == 366:
+            #     print("test is",test)
+            #     self.run_test(test, "paren")
 
     def assert_error(self, result, error_name, line_no, x):
         self.assertEqual(result['success'], False)
@@ -80,29 +87,29 @@ class TestParinfer(unittest.TestCase):
         result = modeFn[mode](text, None);
         self.assert_error(result, error_name, line_no, x)
 
-    # def test_errors(self):
-    #     self.check_error('indent', '(foo"', "unclosed-quote", 0, 4)
-    #     self.check_error('paren', '(foo"', "unclosed-quote", 0, 4)
-    #     self.check_error('paren', '(foo', "unclosed-paren", 0, 0)
-    #     self.check_error('paren', '; "foo', "quote-danger", 0, 2)
-    #     self.check_error('paren', '(foo \\', "eol-backslash", 0, 5)
-    #     self.check_error('paren', '(foo]\nbar)', "unmatched-close-paren", 0, 4)
+    def test_errors(self):
+        self.check_error('indent', '(foo"', "unclosed-quote", 0, 4)
+        self.check_error('paren', '(foo"', "unclosed-quote", 0, 4)
+        self.check_error('paren', '(foo', "unclosed-paren", 0, 0)
+        self.check_error('paren', '; "foo', "quote-danger", 0, 2)
+        self.check_error('paren', '(foo \\', "eol-backslash", 0, 5)
+        self.check_error('paren', '(foo]\nbar)', "unmatched-close-paren", 0, 4)
 
     # def check_changed_lines(self, mode, text, changed_lines):
     #     result = modeFn[mode](text, None)
-    #     print(result)
+    #     # print(result)
     #     self.assertEqual(result['changedLines'], changed_lines)
 
-    # def check_result(self, mode, text, expected_text):
-    #     result = modeFn[mode](text, None)
-    #     # print(result)
-    #     self.assertEqual(result['text'], expected_text)
+    def check_result(self, mode, text, expected_text):
+        result = modeFn[mode](text, None)
+        # print(result)
+        self.assertEqual(result['text'], expected_text)
 
-    # def test_sanity(self):
-    #     self.check_result('indent', "(foo\nbar", "(foo)\nbar")
-    #     self.check_result('indent', "(foo\nbar)", "(foo)\nbar")
-    #     self.check_result('paren', "(foo\nbar)", "(foo\n bar)")
-    #     # self.check_result('paren', "(foo]\nbar)", "(foo\n bar)")
+    def test_sanity(self):
+        self.check_result('indent', "(foo\nbar", "(foo)\nbar")
+        self.check_result('indent', "(foo\nbar)", "(foo)\nbar")
+        self.check_result('paren', "(foo\nbar)", "(foo\n bar)")
+        # self.check_result('paren', "(foo]\nbar)", "(foo\n bar)")
 
 if __name__ == "__main__":
     unittest.main()

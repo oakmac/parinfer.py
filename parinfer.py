@@ -58,8 +58,8 @@ def transformChange(change):
     if not change:
         return None
 
-    newLines = change.newText.split(LINE_ENDING_REGEX)
-    oldLines = change.oldText.split(LINE_ENDING_REGEX)
+    newLines = re.split(LINE_ENDING_REGEX, change['newText'])
+    oldLines = re.split(LINE_ENDING_REGEX, change['oldText'])
 
     # single line case:
     #    (defn foo| [])
@@ -77,15 +77,15 @@ def transformChange(change):
     lastOldLineLen = len(oldLines[len(oldLines)-1])
     lastNewLineLen = len(newLines[len(newLines)-1])
 
-    oldEndX = (change.x if len(oldLines) == 1 else 0) + lastOldLineLen
-    newEndX = (change.x if len(newLines) == 1 else 0) + lastNewLineLen
-    newEndLineNo = change.lineNo + (len(newLines)-1)
+    oldEndX = (change['x'] if len(oldLines) == 1 else 0) + lastOldLineLen
+    newEndX = (change['x'] if len(newLines) == 1 else 0) + lastNewLineLen
+    newEndLineNo = change['lineNo'] + (len(newLines)-1)
 
     return {
-        'x': change.x,
-        'lineNo': change.lineNo,
-        'oldText': change.oldText,
-        'newText': change.newText,
+        'x': change['x'],
+        'lineNo': change['lineNo'],
+        'oldText': change['oldText'],
+        'newText': change['newText'],
 
         'oldEndX': oldEndX,
         'newEndX': newEndX,
@@ -103,11 +103,13 @@ def transformChanges(changes):
     lines = {}
     for change in changes:
         change = transformChange(change)
-        line = lines[change.lookupLineNo]
-        if not line:
-            line = lines[change.lookupLineNo] = {}
+        # print("change:",change['lookupLineNo'])
+        if change['lookupLineNo'] not in lines:
+            line = lines[change['lookupLineNo']] = {}
+        else:
+            line = lines[change['lookupLineNo']]
 
-        line[change.lookupX] = change
+        line[change['lookupX']] = change
 
     return lines
 
@@ -345,15 +347,16 @@ def error(result, name):
     p("result.partialResult",result.partialResult, file=sys.stderr)
 
     if name == ERROR_UNMATCHED_CLOSE_PAREN:
-        openerLineNo = opener.LineNo if result.partialResult else opener.inputLineNo
-        openerX = opener.x if result.partialResult else opener.inputX
-
         # extra error info for locating the open-paren that it should've matched
 
         if ERROR_UNMATCHED_OPEN_PAREN in result.errorPosCache:
             cache = result.errorPosCache[ERROR_UNMATCHED_OPEN_PAREN]
 
         if cache or opener:
+            if opener:
+                openerLineNo = opener.LineNo if result.partialResult else opener.inputLineNo
+                openerX = opener.x if result.partialResult else opener.inputX
+
             e['extra'] = {
                 'name': ERROR_UNMATCHED_OPEN_PAREN,
                 'lineNo': cache[keyLineNo] if cache else openerLineNo,
@@ -800,11 +803,11 @@ def isCursorInComment(result, cursorX, cursorLine):
 def handleChangeDelta(result):
     p("handleChangeDelta")
     if (result.changes and (result.smart or result.mode == PAREN_MODE)):
-        line = result.changes[result.inputLineNo]
-        if line:
-            change = line[result.inputX]
-            if change:
-                result.indentDelta += (change.newEndX - change.oldEndX)
+        if result.inputLineNo in result.changes:
+            line = result.changes[result.inputLineNo]
+            if result.inputX in line:
+                change = line[result.inputX]
+                result.indentDelta += (change['newEndX'] - change['oldEndX'])
 
 #-------------------------------------------------------------------------------
 # Paren Trail defs
@@ -840,6 +843,7 @@ def clampParenTrailToCursor(result):
         newEndX = max(endX, result.cursorX)
 
         line = result.lines[result.lineNo]
+        p("clamp line", line, startX, newStartX)
         removeCount = 0
         for i in range(startX, newStartX):
             if isCloseParen(line[i]):
@@ -1166,15 +1170,18 @@ def rememberParenTrail(result):
                 openers[i].closer.trail = shortTrail
 
 def updateRememberedParenTrail(result):
-    p("updateRememberedParenTrail")
-    trail = result.parenTrails[len(result.parenTrails)-1]
-    if not trail or trail.lineNo != result.parenTrail.lineNo:
-        rememberParenTrail(result)
+    p("updateRememberedParenTrail",len(result.parenTrails))
+    if result.parenTrails:
+        trail = result.parenTrails[len(result.parenTrails)-1]
+        if trail['lineNo'] != result.parenTrail.lineNo:
+            rememberParenTrail(result)
+        else:
+            trail['endX'] = result.parenTrail.endX
+            if result.returnParens:
+                opener = result.parenTrail.openers[len(result.parenTrail.openers)-1]
+                opener.closer.trail = trail
     else:
-        trail.endX = result.parenTrail.endX
-        if result.returnParens:
-            opener = result.parenTrail.openers[len(result.parenTrail.openers)-1]
-            opener.closer.trail = trail
+        rememberParenTrail(result)
 
 def finishNewParenTrail(result):
     p("finishNewParenTrail")
@@ -1258,7 +1265,7 @@ def onLeadingCloseParen(result):
         if not result.forceBalance:
             if result.smart:
                 raise ParinferError({'leadingCloseParen': True})
-        if ERROR_LEADING_CLOSE_PAREN in result.errorPosCache and not result.errorPosCache[ERROR_LEADING_CLOSE_PAREN]:
+        if ERROR_LEADING_CLOSE_PAREN not in result.errorPosCache:
             cacheErrorPos(result, ERROR_LEADING_CLOSE_PAREN)
         result.skipChar = True
 
