@@ -165,6 +165,49 @@ class Result:
         'error',
         'errorPosCache')
 
+    def __str__(self):
+        return ('Result {' + 'mode: ' + str(self.mode) + '\n\t'
+                'smart: ' + str(self.smart) + '\n\t'
+                'origText: ' + str(self.origText) + '\n\t'
+                'origCursorX: ' + str(self.origCursorX) + '\n\t'
+                'origCursorLine: ' + str(self.origCursorLine) + '\n\t'
+                'inputLines: ' + str(self.inputLines) + '\n\t'
+                'inputLineNo: ' + str(self.inputLineNo) + '\n\t'
+                'inputX: ' + str(self.inputX) + '\n\t'
+                'lines: ' + str(self.lines) + '\n\t'
+                'lineNo: ' + str(self.lineNo) + '\n\t'
+                'ch: ' + str(self.ch) + '\n\t'
+                'x: ' + str(self.x) + '\n\t'
+                'indentX: ' + str(self.indentX) + '\n\t'
+                'parenStack: ' + str(self.parenStack) + '\n\t'
+                'tabStops: ' + str(self.tabStops) + '\n\t'
+                'parenTrail: ' + str(self.parenTrail) + '\n\t'
+                'parenTrails: ' + str(self.parenTrails) + '\n\t'
+                'returnParens: ' + str(self.returnParens) + '\n\t'
+                'parens: ' + str(self.parens) + '\n\t'
+                'cursorX: ' + str(self.cursorX) + '\n\t'
+                'cursorLine: ' + str(self.cursorLine) + '\n\t'
+                'prevCursorX: ' + str(self.prevCursorX) + '\n\t'
+                'prevCursorLine: ' + str(self.prevCursorLine) + '\n\t'
+                'selectionStartLine: ' + str(self.selectionStartLine) + '\n\t'
+                'changes: ' + str(self.changes) + '\n\t'
+                'isInCode: ' + str(self.isInCode) + '\n\t'
+                'isEscaping: ' + str(self.isEscaping) + '\n\t'
+                'isEscaped: ' + str(self.isEscaped) + '\n\t'
+                'isInStr: ' + str(self.isInStr) + '\n\t'
+                'isInComment: ' + str(self.isInComment) + '\n\t'
+                'commentX: ' + str(self.commentX) + '\n\t'
+                'quoteDanger: ' + str(self.quoteDanger) + '\n\t'
+                'trackingIndent: ' + str(self.trackingIndent) + '\n\t'
+                'skipChar: ' + str(self.skipChar) + '\n\t'
+                'success: ' + str(self.success) + '\n\t'
+                'partialResult: ' + str(self.partialResult) + '\n\t'
+                'forceBalance: ' + str(self.forceBalance) + '\n\t'
+                'maxIndent: ' + str(self.maxIndent) + '\n\t'
+                'indentDelta: ' + str(self.indentDelta) + '\n\t'
+                'trackingArgTabStop: ' + str(self.trackingArgTabStop) + '\n\t'
+                'error: ' + str(self.error) + '\n\t'
+                'errorPosCache: ' + str(self.errorPosCache) + '\n\t}')
 
     def __init__(self, text, options, mode, smart):
         p("Result __init__")
@@ -181,7 +224,7 @@ class Result:
         self.inputLines = re.split(LINE_ENDING_REGEX, text)
         
         self.inputLineNo = -1           # [integer] - the current input line number
-        self.inputX: -1                 # [integer] - the current input x position of the current character (ch)
+        self.inputX = -1                # [integer] - the current input x position of the current character (ch)
 
         self.lines = []                 # [string array] - output lines (with corrected parens or indentation)
         self.lineNo = -1                # [integer] - output line number we are on
@@ -344,7 +387,7 @@ def error(result, name):
     }
     opener = peek(result.parenStack, 0)
 
-    p("result.partialResult",result.partialResult, file=sys.stderr)
+    # p("result.partialResult",result.partialResult, file=sys.stderr)
 
     if name == ERROR_UNMATCHED_CLOSE_PAREN:
         # extra error info for locating the open-paren that it should've matched
@@ -560,7 +603,7 @@ def checkCursorHolding(result):
             holdMinX <= result.prevCursorX and result.prevCursorX <= holdMaxX
         )
         if prevHolding and not holding:
-            raise {'releaseCursorHold': True}
+            raise ParinferError({'releaseCursorHold': True})
     return holding
 
 def trackArgTabStop(result, state):
@@ -1497,8 +1540,8 @@ def paren_mode(text, options):
 def smart_mode(text, options):
     p("smart_mode")
     smart = False
-    if isinstance(options, dict) and 'selectionStartLine' in options:
-        smart = options['selectionStartLine'] == None
+    if isinstance(options, dict):
+        smart = 'selectionStartLine' not in options or options['selectionStartLine'] is None
     return publicResult(processText(text, options, INDENT_MODE, smart))
 
 API = {

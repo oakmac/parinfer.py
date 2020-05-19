@@ -2,7 +2,7 @@ import cProfile
 import os
 import time
 
-from parinfer import indent_mode, paren_mode
+from parinfer import indent_mode, paren_mode, smart_mode
 
 def timeProcess(name, string, options):
     numlines = len(string.splitlines())
@@ -18,6 +18,11 @@ def timeProcess(name, string, options):
     paren_mode(string, options)
     dt = (time.perf_counter() - t) * 1000
     print("paren:", '{:.3f}'.format(dt), "ms")
+
+    t = time.perf_counter()
+    smart_mode(string, options)
+    dt = (time.perf_counter() - t) * 1000
+    print("smart:", '{:.3f}'.format(dt), "ms")
 
     print()
 
