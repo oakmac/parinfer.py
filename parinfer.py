@@ -10,7 +10,7 @@
 ## https://github.com/oakmac/parinfer.py/blob/master/LICENSE.md
 
 import re
-import sys
+# import sys
 
 #-------------------------------------------------------------------------------
 # Constants
@@ -314,6 +314,13 @@ class Result:
             if 'returnParens' in options:
                 self.returnParens = options['returnParens']
 
+    # def isClosable(self):
+    #     ch = self.ch
+    #     closer = ch in CLOSE_PARENS and not self.isEscaped
+    #     # closer = ch in ('}', ')', ']') and not result.isEscaped
+    #     return self.isInCode and not isWhitespace(self) and ch != '' and not closer
+    #     # return result.isInCode and not ch in (BLANK_SPACE, DOUBLE_SPACE) and ch != '' and not closer
+
 def getInitialResult(text, options, mode, smart):
     """Returns a dictionary of the initial state."""
 
@@ -357,9 +364,7 @@ class ParinferError(Exception):
     pass
 
 def error(result, name):
-    cache = {}
-    if name in result.errorPosCache:
-        cache = result.errorPosCache[name]
+    cache = result.errorPosCache.get(name, {})
 
     resultLineNo = result.LineNo if result.partialResult else result.inputLineNo
     resultX = result.x if result.partialResult else result.inputX
@@ -480,12 +485,12 @@ def initLine(result):
     result.trackingIndent = not result.isInStr
 
 # if the current character has changed, commit its change to the current line.
-def commitChar(result, origCh):
-    ch = result.ch
-    if origCh != ch:
-        replaceWithinLine(result, result.lineNo, result.x, result.x + len(origCh), ch)
-        result.indentDelta -= (len(origCh) - len(ch))
-    result.x += len(ch)
+# def commitChar(result, origCh):
+#     ch = result.ch
+#     if origCh != ch:
+#         replaceWithinLine(result, result.lineNo, result.x, result.x + len(origCh), ch)
+#         result.indentDelta -= (len(origCh) - len(ch))
+#     result.x += len(ch)
 
 #-------------------------------------------------------------------------------
 # Misc Utils
@@ -532,9 +537,7 @@ def isValidCloseParen(parenStack, ch):
     return peek(parenStack, 0).ch == MATCH_PAREN[ch]
 
 def isWhitespace(result):
-    ch = result.ch
-    # return not result.isEscaped and (ch == BLANK_SPACE or ch == DOUBLE_SPACE)
-    return not result.isEscaped and ch in (BLANK_SPACE, DOUBLE_SPACE)
+    return not result.isEscaped and result.ch in WHITESPACE
 
 # can this be the last code character of a list?
 def isClosable(result):
@@ -584,7 +587,7 @@ def trackArgTabStop(result, state):
 #-------------------------------------------------------------------------------
 
 class Opener(object):
-    __slots__ = ('self', 'inputLineNo', 'inputX', 'lineNo', 'x', 'ch', 'indentDelta', 'maxChildIndent', 'argX')
+    __slots__ = ('self', 'inputLineNo', 'inputX', 'lineNo', 'x', 'ch', 'indentDelta', 'maxChildIndent', 'argX', 'children', 'closer')
     def __init__(self, inputLineNo, inputX, lineNo, x, ch, indentDelta, maxChildIndent):
         super(Opener, self).__init__()
         self.inputLineNo = inputLineNo
@@ -595,16 +598,18 @@ class Opener(object):
         self.indentDelta = indentDelta
         self.maxChildIndent = maxChildIndent
         self.argX = None
+        self.children = None
+        self.closer = None
 
     def __str__(self):
         return ("{ inputLineNo: " + str(self.inputLineNo)
-            + "\n  inputX: " + str(self.inputX)
-            + "\n  lineNo: " + str(self.lineNo)
-            + "\n  x: " + str(self.x)
-            + "\n  ch: " + str(self.ch)
-            + "\n  indentDelta: " + str(self.indentDelta)
-            + "\n  maxChildIndent: " + str(self.maxChildIndent)
-            + "}")
+                + "\n  inputX: " + str(self.inputX)
+                + "\n  lineNo: " + str(self.lineNo)
+                + "\n  x: " + str(self.x)
+                + "\n  ch: " + str(self.ch)
+                + "\n  indentDelta: " + str(self.indentDelta)
+                + "\n  maxChildIndent: " + str(self.maxChildIndent)
+                + "}")
 
         # opener = {
         #     'inputLineNo': result.inputLineNo,
@@ -712,7 +717,7 @@ def onQuote(result):
         result.isInStr = False
     elif result.isInComment:
         result.quoteDanger = not result.quoteDanger
-        if (result.quoteDanger):
+        if result.quoteDanger:
             cacheErrorPos(result, ERROR_QUOTE_DANGER)
     else:
         result.isInStr = True
@@ -734,36 +739,47 @@ def afterBackslash(result):
 # Character dispatch
 #-------------------------------------------------------------------------------
 
+CHAR_DISPATCH = {
+    '(': onOpenParen,
+    '{': onOpenParen,
+    '[': onOpenParen,
+    ')': onCloseParen,
+    '}': onCloseParen,
+    ']': onCloseParen,
+    BACKSLASH: onBackslash,
+    SEMICOLON: onSemicolon,
+    TAB: onTab,
+    NEWLINE: onNewline,
+    DOUBLE_QUOTE: onQuote,
+}
+
 def onChar(result):
-    ch = result.ch
     result.isEscaped = False
 
     if result.isEscaping:
         afterBackslash(result)
-    elif ch in OPEN_PARENS:
-        onOpenParen(result)
-    elif ch in CLOSE_PARENS:
-        onCloseParen(result)
-    elif ch == DOUBLE_QUOTE:
-        onQuote(result)
-    elif ch == SEMICOLON:
-        onSemicolon(result)
-    elif ch == BACKSLASH:
-        onBackslash(result)
-    elif ch == TAB:
-        onTab(result)
-    elif ch == NEWLINE:
-        onNewline(result)
+    else:
+        dispatch = CHAR_DISPATCH.get(result.ch, None)
+        if dispatch is not None:
+            dispatch(result)
 
-    ch = result.ch
+    # ch = result.ch
 
     result.isInCode = not result.isInComment and not result.isInStr
 
+        # can this be the last code character of a list?
+    # def isClosable(result):
+    #     ch = result.ch
+    #     closer = ch in CLOSE_PARENS and not result.isEscaped
+        # closer = ch in ('}', ')', ']') and not result.isEscaped
+    # closable = result.isInCode and not (not result.isEscaped and result.ch in WHITESPACE) and ch != '' and not (ch in CLOSE_PARENS and not result.isEscaped)
+        # return result.isInCode and not ch in (BLANK_SPACE, DOUBLE_SPACE) and ch != '' and not closer
+    # if closable:
     if isClosable(result):
-        resetParenTrail(result, result.lineNo, result.x+len(ch))
+        resetParenTrail(result, result.lineNo, result.x+len(result.ch))
 
     state = result.trackingArgTabStop
-    if (state):
+    if state:
         trackArgTabStop(result, state)
 
 #-------------------------------------------------------------------------------
@@ -790,7 +806,7 @@ def isCursorInComment(result, cursorX, cursorLine):
     return isCursorRightOf(cursorX, cursorLine, result.commentX, result.lineNo)
 
 def handleChangeDelta(result):
-    if (result.changes and (result.smart or result.mode == PAREN_MODE)):
+    if result.changes and (result.smart or result.mode == PAREN_MODE):
         if result.inputLineNo in result.changes:
             line = result.changes[result.inputLineNo]
             if result.inputX in line:
@@ -1313,7 +1329,12 @@ def processChar(result, ch):
     else:
         onChar(result)
 
-    commitChar(result, origCh)
+    # commitChar(result, origCh)
+    ch = result.ch
+    if origCh != ch:
+        replaceWithinLine(result, result.lineNo, result.x, result.x + len(origCh), ch)
+        result.indentDelta -= (len(origCh) - len(ch))
+    result.x += len(ch)
 
 def processLine(result, lineNo):
     initLine(result)
@@ -1321,7 +1342,7 @@ def processLine(result, lineNo):
 
     setTabStops(result)
 
-    for x in range(0,len(result.inputLines[lineNo])):
+    for x in range(len(result.inputLines[lineNo])):
         result.inputX = x
         processChar(result, result.inputLines[lineNo][x])
     processChar(result, NEWLINE)
