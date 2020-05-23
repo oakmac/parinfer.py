@@ -31,7 +31,9 @@ TAB = '\t'
 
 LINE_ENDING_REGEX = re.compile(r"\r?\n")
 
-# CLOSE_PARENS = frozenset(['}', ')', ']'])
+CLOSE_PARENS = frozenset(['}', ')', ']'])
+OPEN_PARENS = frozenset(['{', '(', '['])
+WHITESPACE = frozenset([NEWLINE, BLANK_SPACE, TAB])
 
 MATCH_PAREN = {
     '{': '}',
@@ -524,13 +526,6 @@ if RUN_ASSERTS:
 # Questions about characters
 #-------------------------------------------------------------------------------
 
-def isOpenParen(ch):
-    return ch == '{' or ch == '(' or ch == '['
-
-def isCloseParen(ch):
-    return ch == '}' or ch == ')' or ch == ']'
-    # return ch in CLOSE_PARENS
-
 def isValidCloseParen(parenStack, ch):
     if len(parenStack) == 0:
         return False
@@ -544,7 +539,7 @@ def isWhitespace(result):
 # can this be the last code character of a list?
 def isClosable(result):
     ch = result.ch
-    closer = isCloseParen(ch) and not result.isEscaped
+    closer = ch in CLOSE_PARENS and not result.isEscaped
     # closer = ch in ('}', ')', ']') and not result.isEscaped
     return result.isInCode and not isWhitespace(result) and ch != '' and not closer
     # return result.isInCode and not ch in (BLANK_SPACE, DOUBLE_SPACE) and ch != '' and not closer
@@ -745,9 +740,9 @@ def onChar(result):
 
     if result.isEscaping:
         afterBackslash(result)
-    elif isOpenParen(ch):
+    elif ch in OPEN_PARENS:
         onOpenParen(result)
-    elif isCloseParen(ch):
+    elif ch in CLOSE_PARENS:
         onCloseParen(result)
     elif ch == DOUBLE_QUOTE:
         onQuote(result)
@@ -835,7 +830,7 @@ def clampParenTrailToCursor(result):
         line = result.lines[result.lineNo]
         removeCount = 0
         for i in range(startX, newStartX):
-            if isCloseParen(line[i]):
+            if line[i] in CLOSE_PARENS:
                 removeCount += 1
 
         openers = result.parenTrail.openers
@@ -1074,7 +1069,7 @@ def cleanParenTrail(result):
     newTrail = ''
     spaceCount = 0
     for i in range(startX, endX):
-        if isCloseParen(line[i]):
+        if line[i] in CLOSE_PARENS:
             newTrail += line[i]
         else:
             spaceCount += 1
@@ -1259,15 +1254,13 @@ def onCommentLine(result):
             result.parenStack.pop()
 
 def checkIndent(result):
-    if isCloseParen(result.ch):
+    if result.ch in CLOSE_PARENS:
         onLeadingCloseParen(result)
     elif result.ch == SEMICOLON:
         # comments don't count as indentation points
         onCommentLine(result)
         result.trackingIndent = False
-    elif (result.ch != NEWLINE and
-            result.ch != BLANK_SPACE and
-            result.ch != TAB):
+    elif result.ch not in WHITESPACE:
         onIndent(result)
 
 def makeTabStop(result, opener):
@@ -1348,7 +1341,7 @@ def finalizeResult(result):
 
     if len(result.parenStack) != 0:
         if result.mode == PAREN_MODE:
-          raise error(result, ERROR_UNCLOSED_PAREN)
+            raise error(result, ERROR_UNCLOSED_PAREN)
 
     if result.mode == INDENT_MODE:
         initLine(result)
