@@ -10,13 +10,13 @@
 ## https://github.com/oakmac/parinfer.py/blob/master/LICENSE.md
 
 import re
-# import sys
+import sys
 
 #-------------------------------------------------------------------------------
 # Constants
 #-------------------------------------------------------------------------------
 
-UINT_NULL = -999
+# None = -999
 
 INDENT_MODE = 'INDENT_MODE'
 PAREN_MODE = 'PAREN_MODE'
@@ -120,16 +120,16 @@ def transformChanges(changes):
 class Clamped(object):
     __slots__ = ('startX', 'endX', 'openers')
     def __init__(self):
-        self.startX = UINT_NULL       # startX before paren trail was clamped
-        self.endX = UINT_NULL         # endX before paren trail was clamped
+        self.startX = None       # startX before paren trail was clamped
+        self.endX = None         # endX before paren trail was clamped
         self.openers = []             # openers that were cut out after paren trail was clamped
 
 class ParenTrail(object):
     __slots__ = ('lineNo', 'startX', 'endX', 'openers', 'clamped')
     def __init__(self):
-        self.lineNo = UINT_NULL       # [integer] - line number of the last parsed paren trail
-        self.startX = UINT_NULL       # [integer] - x position of first paren in this range
-        self.endX = UINT_NULL         # [integer] - x position after the last paren in this range
+        self.lineNo = None       # [integer] - line number of the last parsed paren trail
+        self.startX = None       # [integer] - x position of first paren in this range
+        self.endX = None         # [integer] - x position after the last paren in this range
         self.openers = []             # [array of stack elements] - corresponding open-paren for each close-paren in this range
         self.clamped = Clamped()
 
@@ -209,8 +209,8 @@ class Result:
         self.smart = smart              # [boolean] - smart mode attempts special user-friendly behavior
 
         self.origText = text            # [string] - original text
-        self.origCursorX = UINT_NULL    # [integer] - original cursorX option
-        self.origCursorLine = UINT_NULL # [integer] - original cursorLine option
+        self.origCursorX = None    # [integer] - original cursorX option
+        self.origCursorLine = None # [integer] - original cursorLine option
 
                                         # [string array] - input lines that we process line-by-line char-by-char
         self.inputLines = re.split(LINE_ENDING_REGEX, text)
@@ -222,7 +222,7 @@ class Result:
         self.lineNo = -1                # [integer] - output line number we are on
         self.ch = ''                    # [string] - character we are processing (can be changed to indicate a replacement)
         self.x = 0                      # [integer] - output x position of the current character (ch)
-        self.indentX = UINT_NULL        # [integer] - x position of the indentation point if present
+        self.indentX = None        # [integer] - x position of the indentation point if present
 
         self.parenStack = []            # We track where we are in the Lisp tree by keeping a stack (array) of open-parens.
                                         # Stack elements are objects containing keys {ch, x, lineNo, indentDelta}
@@ -239,12 +239,12 @@ class Result:
         self.returnParens = False       # [boolean] - determines if we return `parens` described below
         self.parens = []                # [array of {lineNo, x, closer, children}] - paren tree if `returnParens` is h
 
-        self.cursorX = UINT_NULL        # [integer] - x position of the cursor
-        self.cursorLine = UINT_NULL     # [integer] - line number of the cursor
-        self.prevCursorX = UINT_NULL    # [integer] - x position of the previous cursor
-        self.prevCursorLine = UINT_NULL # [integer] - line number of the previous cursor
+        self.cursorX = None        # [integer] - x position of the cursor
+        self.cursorLine = None     # [integer] - line number of the cursor
+        self.prevCursorX = None    # [integer] - x position of the previous cursor
+        self.prevCursorLine = None # [integer] - line number of the previous cursor
 
-        self.selectionStartLine = UINT_NULL # [integer] - line number of the current selection starting point
+        self.selectionStartLine = None # [integer] - line number of the current selection starting point
 
         self.changes = None             # [object] - mapping change.key to a change object (please see `transformChange` for object structure)
 
@@ -253,7 +253,7 @@ class Result:
         self.isEscaped = False          # [boolean] - indicates if the current character is escaped (e.g. `\c`).  This may be inside string comment or code.
         self.isInStr = False            # [boolean] - indicates if we are currently inside a string
         self.isInComment = False        # [boolean] - indicates if we are currently inside a comment
-        self.commentX = UINT_NULL       # [integer] - x position of the start of comment on current line (if any)
+        self.commentX = None       # [integer] - x position of the start of comment on current line (if any)
 
         self.quoteDanger = False        # [boolean] - indicates if quotes are imbalanced inside of a comment (dangerous)
         self.trackingIndent = False     # [boolean] - are we looking for the indentation point of the current line?
@@ -262,7 +262,7 @@ class Result:
         self.partialResult = False      # [boolean] - should we return a partial result when an error occurs?
         self.forceBalance = False       # [boolean] - should indent mode aggressively enforce paren balance?
 
-        self.maxIndent = UINT_NULL      # [integer] - maximum allowed indentation of subsequent lines in Paren Mode
+        self.maxIndent = sys.maxsize    # [integer] - maximum allowed indentation of subsequent lines in Paren Mode
         self.indentDelta = 0            # [integer] - how far indentation was shifted by Paren Mode
                                         #  (preserves relative indentation of nested expressions)
 
@@ -452,7 +452,7 @@ def shiftCursorOnEdit(result, lineNo, start, end, replace):
 
     if (dx != 0 and
             result.cursorLine == lineNo and
-            result.cursorX != UINT_NULL and
+            result.cursorX != None and
             isCursorAffected(result, start, end)):
         result.cursorX += dx
 
@@ -471,8 +471,8 @@ def initLine(result):
     result.lineNo += 1
 
     # reset line-specific state
-    result.indentX = UINT_NULL
-    result.commentX = UINT_NULL
+    result.indentX = None
+    result.commentX = None
     result.indentDelta = 0
     if ERROR_UNMATCHED_CLOSE_PAREN in result.errorPosCache:
         del result.errorPosCache[ERROR_UNMATCHED_CLOSE_PAREN]
@@ -497,20 +497,16 @@ def initLine(result):
 #-------------------------------------------------------------------------------
 
 def clamp(val, minN, maxN):
-    if minN != UINT_NULL:
-        val = max(minN, val)
-    if maxN != UINT_NULL:
-        val = min(maxN, val)
-    return val
+    return max(minN, min(val, maxN))
 
-if RUN_ASSERTS:
-    assert clamp(1, 3, 5) == 3
-    assert clamp(9, 3, 5) == 5
-    assert clamp(1, 3, UINT_NULL) == 3
-    assert clamp(5, 3, UINT_NULL) == 5
-    assert clamp(1, UINT_NULL, 5) == 1
-    assert clamp(9, UINT_NULL, 5) == 5
-    assert clamp(1, UINT_NULL, UINT_NULL) == 1
+# if RUN_ASSERTS:
+#     assert clamp(1, 3, 5) == 3
+#     assert clamp(9, 3, 5) == 5
+#     assert clamp(1, 3, None) == 3
+#     assert clamp(5, 3, None) == 5
+#     assert clamp(1, None, 5) == 1
+#     assert clamp(9, None, 5) == 5
+#     assert clamp(1, None, None) == 1
 
 def peek(arr, idxFromBack):
     maxIdx = len(arr) - 1
@@ -562,7 +558,7 @@ def checkCursorHolding(result):
         result.cursorLine == opener.lineNo and
         holdMinX <= result.cursorX and result.cursorX <= holdMaxX
     )
-    shouldCheckPrev = not result.changes and result.prevCursorLine != UINT_NULL
+    shouldCheckPrev = not result.changes and result.prevCursorLine != None
     if shouldCheckPrev:
         prevHolding = (
             result.prevCursorLine == opener.lineNo and
@@ -619,7 +615,7 @@ class Opener(object):
         #     'x': result.x,
         #     'ch': result.ch,
         #     'indentDelta': result.indentDelta,
-        #     'maxChildIndent': UINT_NULL
+        #     'maxChildIndent': None
         # }
 
 def onOpenParen(result):
@@ -631,15 +627,15 @@ def onOpenParen(result):
             result.x,
             result.ch,
             result.indentDelta,
-            UINT_NULL
+            sys.maxsize,
         )
 
         if result.returnParens:
             opener.children = []
             opener.closer = {
-                lineNo: UINT_NULL,
-                x: UINT_NULL,
-                ch: ''
+                'lineNo': None,
+                'x': None,
+                'ch': ''
             }
             parent = peek(result.parenStack, 0)
             parent = parent.children if parent else result.parens
@@ -789,16 +785,16 @@ def onChar(result):
 def isCursorLeftOf(cursorX, cursorLine, x, lineNo):
     return (
         cursorLine == lineNo and
-        x != UINT_NULL and
-        cursorX != UINT_NULL and
+        x != None and
+        cursorX != None and
         cursorX <= x # inclusive since (cursorX = x) implies (x-1 < cursor < x)
     )
 
 def isCursorRightOf(cursorX, cursorLine, x, lineNo):
     return (
         cursorLine == lineNo and
-        x != UINT_NULL and
-        cursorX != UINT_NULL and
+        x != None and
+        cursorX != None and
         cursorX > x
     )
 
@@ -822,8 +818,8 @@ def resetParenTrail(result, lineNo, x):
     result.parenTrail.startX = x
     result.parenTrail.endX = x
     result.parenTrail.openers = []
-    result.parenTrail.clamped.startX = UINT_NULL
-    result.parenTrail.clamped.endX = UINT_NULL
+    result.parenTrail.clamped.startX = None
+    result.parenTrail.clamped.endX = None
     result.parenTrail.clamped.openers = []
 
 def isCursorClampingParenTrail(result, cursorX, cursorLine):
@@ -1067,7 +1063,7 @@ def correctParenTrail(result, indentX):
         if result.returnParens:
             setCloser(opener, result.parenTrail.lineNo, result.parenTrail.startX+i, closeCh)
 
-    if result.parenTrail.lineNo != UINT_NULL:
+    if result.parenTrail.lineNo != None:
         replaceWithinLine(result, result.parenTrail.lineNo, result.parenTrail.startX, result.parenTrail.endX, parens)
         result.parenTrail.endX = result.parenTrail.startX + len(parens)
         rememberParenTrail(result)
@@ -1130,7 +1126,7 @@ def rememberParenTrail(result):
     trail = result.parenTrail
     openers = trail.clamped.openers + trail.openers
     if len(openers) > 0:
-        isClamped = trail.clamped.startX != UINT_NULL
+        isClamped = trail.clamped.startX != None
         allClamped = len(trail.openers) == 0
         shortTrail = {
             'lineNo': trail.lineNo,
@@ -1290,7 +1286,7 @@ def makeTabStop(result, opener):
     return tabStop
 
 def getTabStopLine(result):
-    return result.selectionStartLine if result.selectionStartLine != UINT_NULL else result.cursorLine
+    return result.selectionStartLine if result.selectionStartLine != None else result.cursorLine
 
 def setTabStops(result):
     if getTabStopLine(result) != result.lineNo:
@@ -1425,9 +1421,9 @@ def publicResult(result):
         if result.partialResult and result.returnParens:
             final.parens = result.parens
 
-    if final['cursorX'] == UINT_NULL:
+    if final['cursorX'] == None:
         del final['cursorX']
-    if final['cursorLine'] == UINT_NULL:
+    if final['cursorLine'] == None:
         del final['cursorLine']
     if 'tabStops' in final and len(final['tabStops']) == 0:
         del final['tabStops']
