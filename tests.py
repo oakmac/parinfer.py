@@ -61,7 +61,6 @@ class TestParinfer(unittest.TestCase):
             self.assertEqual(actual['parenTrails'], expected['parenTrails'])
 
     def run_test(self, case, mode):
-        # print(test)
         test_id = mode + ": " + str(case['source']['lineNo'])
 
         expected = case['result']
@@ -69,11 +68,6 @@ class TestParinfer(unittest.TestCase):
         options = {}
         if isinstance(case['options'], dict) and 'options' in case:
             options = case['options']
-
-        # options['returnParens'] = True
-
-        # print("options", options)
-
 
         with self.subTest(test_id):
             actual = modeFn[mode](text, options)
@@ -106,23 +100,14 @@ class TestParinfer(unittest.TestCase):
     def test_indent_mode(self):
         for test in INDENT_MODE_TESTS:
             self.run_test(test, "indent")
-            # if test['source']['lineNo'] == 574:
-                # print("test is",test)
-                # self.run_test(test, "indent")
 
     def test_paren_mode(self):
         for test in PAREN_MODE_TESTS:
             self.run_test(test, "paren")
-            # if test['source']['lineNo'] == 366:
-            #     print("test is",test)
-            #     self.run_test(test, "paren")
 
     def test_smart_mode(self):
         for test in SMART_MODE_TESTS:
             self.run_test(test, 'smart')
-            # if test['source']['lineNo'] == 10:
-            #     print("test is",test)
-            #     self.run_test(test, "smart")
 
     def assert_error(self, result, error_name, line_no, x):
         self.assertEqual(result['success'], False)
@@ -149,7 +134,6 @@ class TestParinfer(unittest.TestCase):
 
     def check_result(self, mode, text, expected_text):
         result = modeFn[mode](text, None)
-        # print(result)
         self.assertEqual(result['text'], expected_text)
 
     def test_sanity(self):
