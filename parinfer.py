@@ -12,10 +12,6 @@
 import re
 import sys
 
-def p(*args, **kwargs):
-    # print(*args, **kwargs)
-    return
-
 #-------------------------------------------------------------------------------
 # Constants
 #-------------------------------------------------------------------------------
@@ -54,7 +50,6 @@ RUN_ASSERTS = False
 #-------------------------------------------------------------------------------
 
 def transformChange(change):
-    p("transformChange")
     if not change:
         return None
 
@@ -96,7 +91,6 @@ def transformChange(change):
     }
 
 def transformChanges(changes):
-    p("transformChanges")
     if len(changes) == 0:
         return None
 
@@ -124,7 +118,6 @@ def transformChanges(changes):
 class Clamped(object):
     __slots__ = ('startX', 'endX', 'openers')
     def __init__(self):
-        p("Clamped __init__")
         self.startX = UINT_NULL       # startX before paren trail was clamped
         self.endX = UINT_NULL         # endX before paren trail was clamped
         self.openers = []             # openers that were cut out after paren trail was clamped
@@ -132,7 +125,6 @@ class Clamped(object):
 class ParenTrail(object):
     __slots__ = ('lineNo', 'startX', 'endX', 'openers', 'clamped')
     def __init__(self):
-        p("ParenTrail __init__")
         self.lineNo = UINT_NULL       # [integer] - line number of the last parsed paren trail
         self.startX = UINT_NULL       # [integer] - x position of first paren in this range
         self.endX = UINT_NULL         # [integer] - x position after the last paren in this range
@@ -140,7 +132,6 @@ class ParenTrail(object):
         self.clamped = Clamped()
 
 def initialParenTrail():
-    p("initialParenTrail")
     return ParenTrail()
 
 class Result:
@@ -210,7 +201,6 @@ class Result:
                 'errorPosCache: ' + str(self.errorPosCache) + '\n\t}')
 
     def __init__(self, text, options, mode, smart):
-        p("Result __init__")
         super(Result, self).__init__()
 
         self.mode = mode                # [enum] - current processing mode (INDENT_MODE or PAREN_MODE)
@@ -323,7 +313,6 @@ class Result:
                 self.returnParens = options['returnParens']
 
 def getInitialResult(text, options, mode, smart):
-    p("getInitialResult")
     """Returns a dictionary of the initial state."""
 
     return Result(text, options, mode, smart)
@@ -353,7 +342,6 @@ errorMessages[ERROR_LEADING_CLOSE_PAREN] = "Line cannot lead with a close-paren.
 errorMessages[ERROR_UNHANDLED] = "Unhandled error."
 
 def cacheErrorPos(result, errorName):
-    p("cacheErrorPos")
     e = {
         'lineNo': result.lineNo,
         'x': result.x,
@@ -367,7 +355,6 @@ class ParinferError(Exception):
     pass
 
 def error(result, name):
-    p("error")
     cache = {}
     if name in result.errorPosCache:
         cache = result.errorPosCache[name]
@@ -386,8 +373,6 @@ def error(result, name):
         'x': cache[keyX] if cache else resultX
     }
     opener = peek(result.parenStack, 0)
-
-    # p("result.partialResult",result.partialResult, file=sys.stderr)
 
     if name == ERROR_UNMATCHED_CLOSE_PAREN:
         # extra error info for locating the open-paren that it should've matched
@@ -419,7 +404,6 @@ def error(result, name):
 #-------------------------------------------------------------------------------
 
 def replaceWithinString(orig, start, end, replace):
-    p("replaceWithinString")
     return orig[:start] + replace + orig[end:]
 
 if RUN_ASSERTS:
@@ -428,7 +412,6 @@ if RUN_ASSERTS:
     assert replaceWithinString('aaa', 0, 2, 'b') == 'ba'
 
 def repeatString(text, n):
-    p("repeatString")
     return text*n
 
 if RUN_ASSERTS:
@@ -439,7 +422,6 @@ if RUN_ASSERTS:
     assert repeatString('', 5) == ''
 
 def getLineEnding(text):
-    p("getLineEnding")
     # NOTE: We assume that if the CR char "\r" is used anywhere,
     #       then we should use CRLF line-endings after every line.
     i = text.find("\r")
@@ -452,13 +434,11 @@ def getLineEnding(text):
 #-------------------------------------------------------------------------------
 
 def isCursorAffected(result, start, end):
-    p("isCursorAffected")
     if result.cursorX == start and result.cursorX == end:
         return result.cursorX == 0
     return result.cursorX >= end
 
 def shiftCursorOnEdit(result, lineNo, start, end, replace):
-    p("shiftCursorOnEdit")
     oldLength = end - start
     newLength = len(replace)
     dx = newLength - oldLength
@@ -470,7 +450,6 @@ def shiftCursorOnEdit(result, lineNo, start, end, replace):
         result.cursorX += dx
 
 def replaceWithinLine(result, lineNo, start, end, replace):
-    p("replaceWithinLine(result",lineNo,start,end,replace,")")
     line = result.lines[lineNo]
     newLine = replaceWithinString(line, start, end, replace)
     result.lines[lineNo] = newLine
@@ -478,11 +457,9 @@ def replaceWithinLine(result, lineNo, start, end, replace):
     shiftCursorOnEdit(result, lineNo, start, end, replace)
 
 def insertWithinLine(result, lineNo, idx, insert):
-    p("insertWithinLine")
     replaceWithinLine(result, lineNo, idx, idx, insert)
 
 def initLine(result):
-    p("initLine")
     result.x = 0
     result.lineNo += 1
 
@@ -502,7 +479,6 @@ def initLine(result):
 
 # if the current character has changed, commit its change to the current line.
 def commitChar(result, origCh):
-    p("commitChar")
     ch = result.ch
     if origCh != ch:
         replaceWithinLine(result, result.lineNo, result.x, result.x + len(origCh), ch)
@@ -514,7 +490,6 @@ def commitChar(result, origCh):
 #-------------------------------------------------------------------------------
 
 def clamp(val, minN, maxN):
-    p("clamp")
     if minN != UINT_NULL:
         val = max(minN, val)
     if maxN != UINT_NULL:
@@ -531,7 +506,6 @@ if RUN_ASSERTS:
     assert clamp(1, UINT_NULL, UINT_NULL) == 1
 
 def peek(arr, idxFromBack):
-    p("peek(",len(arr),idxFromBack,")")
     maxIdx = len(arr) - 1
     if idxFromBack > maxIdx:
         return None
@@ -551,29 +525,24 @@ if RUN_ASSERTS:
 #-------------------------------------------------------------------------------
 
 def isOpenParen(ch):
-    p("isOpenParen")
     return ch == '{' or ch == '(' or ch == '['
 
 def isCloseParen(ch):
-    p("isCloseParen")
     return ch == '}' or ch == ')' or ch == ']'
     # return ch in CLOSE_PARENS
 
 def isValidCloseParen(parenStack, ch):
-    p("isValidCloseParen")
     if len(parenStack) == 0:
         return False
     return peek(parenStack, 0).ch == MATCH_PAREN[ch]
 
 def isWhitespace(result):
-    p("isWhitespace")
     ch = result.ch
     # return not result.isEscaped and (ch == BLANK_SPACE or ch == DOUBLE_SPACE)
     return not result.isEscaped and ch in (BLANK_SPACE, DOUBLE_SPACE)
 
 # can this be the last code character of a list?
 def isClosable(result):
-    p("isClosable")
     ch = result.ch
     closer = isCloseParen(ch) and not result.isEscaped
     # closer = ch in ('}', ')', ']') and not result.isEscaped
@@ -586,7 +555,6 @@ def isClosable(result):
 #-------------------------------------------------------------------------------
 
 def checkCursorHolding(result):
-    p("checkCursorHolding")
     opener = peek(result.parenStack, 0)
     parent = peek(result.parenStack, 1)
     holdMinX = parent.x+1 if parent else 0
@@ -607,7 +575,6 @@ def checkCursorHolding(result):
     return holding
 
 def trackArgTabStop(result, state):
-    p("trackArgTabStop")
     if state == 'space':
         if result.isInCode and isWhitespace(result):
             result.trackingArgTabStop = 'arg'
@@ -624,7 +591,6 @@ def trackArgTabStop(result, state):
 class Opener(object):
     __slots__ = ('self', 'inputLineNo', 'inputX', 'lineNo', 'x', 'ch', 'indentDelta', 'maxChildIndent', 'argX')
     def __init__(self, inputLineNo, inputX, lineNo, x, ch, indentDelta, maxChildIndent):
-        p("Opener __init__")
         super(Opener, self).__init__()
         self.inputLineNo = inputLineNo
         self.inputX = inputX
@@ -657,7 +623,6 @@ class Opener(object):
         # }
 
 def onOpenParen(result):
-    p("onOpenParen")
     if result.isInCode:
         opener = Opener(
             result.inputLineNo,
@@ -684,13 +649,11 @@ def onOpenParen(result):
         result.trackingArgTabStop = 'space'
 
 def setCloser(opener, lineNo, x, ch):
-    p("setCloser")
     opener.closer.lineNo = lineNo
     opener.closer.x = x
     opener.closer.ch = ch
 
 def onMatchedCloseParen(result):
-    p("onMatchedCloseParen")
     opener = peek(result.parenStack, 0)
     if result.returnParens:
         setCloser(opener, result.lineNo, result.x, result.ch)
@@ -711,7 +674,6 @@ def onMatchedCloseParen(result):
     result.trackingArgTabStop = None
 
 def onUnmatchedCloseParen(result):
-    p("onUnmatchedCloseParen")
     if result.mode == PAREN_MODE:
         trail = result.parenTrail
         inLeadingParenTrail = trail.lineNo == result.lineNo and trail.startX == result.indentX
@@ -730,7 +692,6 @@ def onUnmatchedCloseParen(result):
     result.ch = ''
 
 def onCloseParen(result):
-    p("onCloseParen")
     if result.isInCode:
         if isValidCloseParen(result.parenStack, result.ch):
             onMatchedCloseParen(result)
@@ -738,24 +699,20 @@ def onCloseParen(result):
             onUnmatchedCloseParen(result)
 
 def onTab(result):
-    p("onTab")
     if result.isInCode:
         result.ch = DOUBLE_SPACE
 
 def onSemicolon(result):
-    p("onSemicolon")
     if result.isInCode:
         result.isInComment = True
         result.commentX = result.x
         result.trackingArgTabStop = None
 
 def onNewline(result):
-    p("onNewline")
     result.isInComment = False
     result.ch = ''
 
 def onQuote(result):
-    p("onQuote")
     if result.isInStr:
         result.isInStr = False
     elif result.isInComment:
@@ -767,11 +724,9 @@ def onQuote(result):
         cacheErrorPos(result, ERROR_UNCLOSED_QUOTE)
 
 def onBackslash(result):
-    p("onBackslash")
     result.isEscaping = True
 
 def afterBackslash(result):
-    p("afterBackslash")
     result.isEscaping = False
     result.isEscaped = True
 
@@ -785,7 +740,6 @@ def afterBackslash(result):
 #-------------------------------------------------------------------------------
 
 def onChar(result):
-    p("onChar")
     ch = result.ch
     result.isEscaped = False
 
@@ -822,7 +776,6 @@ def onChar(result):
 #-------------------------------------------------------------------------------
 
 def isCursorLeftOf(cursorX, cursorLine, x, lineNo):
-    p("isCursorLeftOf")
     return (
         cursorLine == lineNo and
         x != UINT_NULL and
@@ -831,7 +784,6 @@ def isCursorLeftOf(cursorX, cursorLine, x, lineNo):
     )
 
 def isCursorRightOf(cursorX, cursorLine, x, lineNo):
-    p("isCursorRightOf")
     return (
         cursorLine == lineNo and
         x != UINT_NULL and
@@ -840,11 +792,9 @@ def isCursorRightOf(cursorX, cursorLine, x, lineNo):
     )
 
 def isCursorInComment(result, cursorX, cursorLine):
-    p("isCursorInComment")
     return isCursorRightOf(cursorX, cursorLine, result.commentX, result.lineNo)
 
 def handleChangeDelta(result):
-    p("handleChangeDelta")
     if (result.changes and (result.smart or result.mode == PAREN_MODE)):
         if result.inputLineNo in result.changes:
             line = result.changes[result.inputLineNo]
@@ -857,7 +807,6 @@ def handleChangeDelta(result):
 #-------------------------------------------------------------------------------
 
 def resetParenTrail(result, lineNo, x):
-    p("resetParenTrail")
     result.parenTrail.lineNo = lineNo
     result.parenTrail.startX = x
     result.parenTrail.endX = x
@@ -867,7 +816,6 @@ def resetParenTrail(result, lineNo, x):
     result.parenTrail.clamped.openers = []
 
 def isCursorClampingParenTrail(result, cursorX, cursorLine):
-    p("isCursorClampingParenTrail")
     return (
         isCursorRightOf(cursorX, cursorLine, result.parenTrail.startX, result.lineNo) and
         not isCursorInComment(result, cursorX, cursorLine)
@@ -875,7 +823,6 @@ def isCursorClampingParenTrail(result, cursorX, cursorLine):
 
 # INDENT MODE: allow the cursor to clamp the paren trail
 def clampParenTrailToCursor(result):
-    p("clampParenTrailToCursor")
     startX = result.parenTrail.startX
     endX = result.parenTrail.endX
 
@@ -886,7 +833,6 @@ def clampParenTrailToCursor(result):
         newEndX = max(endX, result.cursorX)
 
         line = result.lines[result.lineNo]
-        p("clamp line", line, startX, newStartX)
         removeCount = 0
         for i in range(startX, newStartX):
             if isCloseParen(line[i]):
@@ -904,7 +850,6 @@ def clampParenTrailToCursor(result):
 
 # INDENT MODE: pops the paren trail from the stack
 def popParenTrail(result):
-    p("popParenTrail")
     startX = result.parenTrail.startX
     endX = result.parenTrail.endX
 
@@ -921,15 +866,12 @@ def popParenTrail(result):
 # behavior by adding its `opener.indentDelta` to the current line's indentation.
 # (care must be taken to prevent redundant indentation correction, detailed below)
 def getParentOpenerIndex(result, indentX):
-    p("getParentOpenerIndex(result,",indentX,")")
     i = 0
-    p("range(len(result.parenStack))",range(len(result.parenStack)))
     # for i in range(len(result.parenStack)):
     parenStackLen = len(result.parenStack)
     while i < parenStackLen:
         # idx = i
         opener = peek(result.parenStack, i)
-        p("    opener",opener)
 
         currOutside = (opener.x < indentX)
 
@@ -938,16 +880,12 @@ def getParentOpenerIndex(result, indentX):
 
         isParent = False
 
-        p("currOutside",currOutside,"prevIndentX",prevIndentX,"prevOutside",prevOutside)
 
         if prevOutside and currOutside:
-            p("prevOutside and currOutside")
             isParent = True
         elif not prevOutside and not currOutside:
-            p("not prevOutside and not currOutside")
             isParent = False
         elif prevOutside and not currOutside:
-            p("prevOutside and not currOutside")
             # POSSIBLE FRAGMENTATION
             # (foo    --\
             #            +--- FRAGMENT `(foo bar)` => `(foo) bar`
@@ -964,7 +902,6 @@ def getParentOpenerIndex(result, indentX):
             #     bar
             # ```
             if result.indentDelta == 0:
-                p("result.indentDelta == 0")
                 isParent = True
 
             # 2. ALLOW FRAGMENTATION
@@ -978,11 +915,9 @@ def getParentOpenerIndex(result, indentX):
             # bar
             # ```
             elif opener.indentDelta == 0:
-                p("opener.indentDelta == 0")
                 isParent = False
 
             else:
-                p("else")
                 # TODO: identify legitimate cases where both are nonzero
 
                 # allow the fragmentation by default
@@ -992,7 +927,6 @@ def getParentOpenerIndex(result, indentX):
                 # 1. give up, just `throw error(...)`
                 # 2. fallback to paren mode to preserve structure
         elif not prevOutside and currOutside:
-            p("not prevOutside and currOutside")
             # POSSIBLE ADOPTION
             # (foo)   --\
             #            +--- ADOPT `(foo) bar` => `(foo bar)`
@@ -1027,11 +961,9 @@ def getParentOpenerIndex(result, indentX):
             #  baz)
             # ```
             if nextOpener and nextOpener.indentDelta <= opener.indentDelta:
-                p("nextOpener and nextOpener.indentDelta <= opener.indentDelta")
                 # we can only disallow adoption if nextOpener.indentDelta will actually
                 # prevent the indentX from being in the opener's threshold.
                 if indentX + nextOpener.indentDelta > opener.x:
-                    p("indentX + nextOpener.indentDelta > opener.x")
                     isParent = True
                 else:
                     isParent = False
@@ -1062,7 +994,6 @@ def getParentOpenerIndex(result, indentX):
             #    baz)
             # ```
             elif nextOpener and nextOpener.indentDelta > opener.indentDelta:
-                p("nextOpener and nextOpener.indentDelta > opener.indentDelta")
                 isParent = True
 
             # 3. ALLOW ADOPTION
@@ -1097,7 +1028,6 @@ def getParentOpenerIndex(result, indentX):
             #   bar)
             # ```
             elif result.indentDelta > opener.indentDelta:
-                p("result.indentDelta > opener.indentDelta")
                 isParent = True
 
             if isParent: # if new parent
@@ -1105,19 +1035,15 @@ def getParentOpenerIndex(result, indentX):
                 opener.indentDelta = 0
 
         if isParent:
-            p("    isParent",i)
-            # p("    i",i)
-            # return i
+            #            # return i
             break
 
         i += 1
 
-    p("    i",i)
     return i
 
 # INDENT MODE: correct paren trail from indentation
 def correctParenTrail(result, indentX):
-    p("correctParenTrail")
     parens = ''
 
     index = getParentOpenerIndex(result, indentX)
@@ -1137,7 +1063,6 @@ def correctParenTrail(result, indentX):
 
 # PAREN MODE: remove spaces from the paren trail
 def cleanParenTrail(result):
-    p("cleanParenTrail")
     startX = result.parenTrail.startX
     endX = result.parenTrail.endX
 
@@ -1160,7 +1085,6 @@ def cleanParenTrail(result):
 
 # PAREN MODE: append a valid close-paren to the end of the paren trail
 def appendParenTrail(result):
-    p("appendParenTrail")
     opener = result.parenStack.pop()
     closeCh = MATCH_PAREN[opener.ch]
     if result.returnParens:
@@ -1174,11 +1098,9 @@ def appendParenTrail(result):
     updateRememberedParenTrail(result)
 
 def invalidateParenTrail(result):
-    p("invalidateParenTrail")
     result.parenTrail = initialParenTrail()
 
 def checkUnmatchedOutsideParenTrail(result):
-    p("checkUnmatchedOutsideParenTrail")
     cache = None
     if ERROR_UNMATCHED_CLOSE_PAREN in result.errorPosCache:
         cache = result.errorPosCache[ERROR_UNMATCHED_CLOSE_PAREN]
@@ -1186,7 +1108,6 @@ def checkUnmatchedOutsideParenTrail(result):
         raise error(result, ERROR_UNMATCHED_CLOSE_PAREN)
 
 def setMaxIndent(result, opener):
-    p("setMaxIndent")
     if opener:
         parent = peek(result.parenStack, 0)
         if parent:
@@ -1195,7 +1116,6 @@ def setMaxIndent(result, opener):
             result.maxIndent = opener.x
 
 def rememberParenTrail(result):
-    p("rememberParenTrail")
     trail = result.parenTrail
     openers = trail.clamped.openers + trail.openers
     if len(openers) > 0:
@@ -1213,7 +1133,6 @@ def rememberParenTrail(result):
                 openers[i].closer.trail = shortTrail
 
 def updateRememberedParenTrail(result):
-    p("updateRememberedParenTrail",len(result.parenTrails))
     if result.parenTrails:
         trail = result.parenTrails[len(result.parenTrails)-1]
         if trail['lineNo'] != result.parenTrail.lineNo:
@@ -1227,7 +1146,6 @@ def updateRememberedParenTrail(result):
         rememberParenTrail(result)
 
 def finishNewParenTrail(result):
-    p("finishNewParenTrail")
     if result.isInStr:
         invalidateParenTrail(result)
     elif result.mode == INDENT_MODE:
@@ -1244,7 +1162,6 @@ def finishNewParenTrail(result):
 #-------------------------------------------------------------------------------
 
 def addIndent(result, delta):
-    p("addIndent")
     origIndent = result.x
     newIndent = origIndent + delta
     indentStr = repeatString(BLANK_SPACE, newIndent)
@@ -1254,13 +1171,11 @@ def addIndent(result, delta):
     result.indentDelta += delta
 
 def shouldAddOpenerIndent(result, opener):
-    p("shouldAddOpenerIndent")
     # Don't add opener.indentDelta if the user already added it.
     # (happens when multiple lines are indented together)
     return opener.indentDelta != result.indentDelta
 
 def correctIndent(result):
-    p("correctIndent")
     origIndent = result.x
     newIndent = origIndent
     minIndent = 0
@@ -1279,7 +1194,6 @@ def correctIndent(result):
         addIndent(result, newIndent - origIndent)
 
 def onIndent(result):
-    p("onIndent")
     result.indentX = result.x
     result.trackingIndent = False
 
@@ -1297,13 +1211,11 @@ def onIndent(result):
         correctIndent(result)
 
 def checkLeadingCloseParen(result):
-    p("checkLeadingCloseParen")
     if (ERROR_LEADING_CLOSE_PAREN in result.errorPosCache and
             result.parenTrail.lineNo == result.lineNo):
         raise error(result, ERROR_LEADING_CLOSE_PAREN)
 
 def onLeadingCloseParen(result):
-    p("onLeadingCloseParen")
     if result.mode == INDENT_MODE:
         if not result.forceBalance:
             if result.smart:
@@ -1326,7 +1238,6 @@ def onLeadingCloseParen(result):
             result.skipChar = True
 
 def onCommentLine(result):
-    p("onCommentLine")
     parenTrailLength = len(result.parenTrail.openers)
 
     # restore the openers matching the previous paren trail
@@ -1348,7 +1259,6 @@ def onCommentLine(result):
             result.parenStack.pop()
 
 def checkIndent(result):
-    p("checkIndent")
     if isCloseParen(result.ch):
         onLeadingCloseParen(result)
     elif result.ch == SEMICOLON:
@@ -1361,7 +1271,6 @@ def checkIndent(result):
         onIndent(result)
 
 def makeTabStop(result, opener):
-    p("makeTabStop")
     tabStop = {
         'ch': opener.ch,
         'x': opener.x,
@@ -1372,11 +1281,9 @@ def makeTabStop(result, opener):
     return tabStop
 
 def getTabStopLine(result):
-    p("getTabStopLine")
     return result.selectionStartLine if result.selectionStartLine != UINT_NULL else result.cursorLine
 
 def setTabStops(result):
-    p("setTabStops")
     if getTabStopLine(result) != result.lineNo:
         return
 
@@ -1398,7 +1305,6 @@ def setTabStops(result):
 #-------------------------------------------------------------------------------
 
 def processChar(result, ch):
-    p("processChar")
     origCh = ch
 
     result.ch = ch
@@ -1417,25 +1323,17 @@ def processChar(result, ch):
     commitChar(result, origCh)
 
 def processLine(result, lineNo):
-    p("processLine")
-    p(lineNo)
     initLine(result)
     result.lines.append(result.inputLines[lineNo])
-    p("result.lines",result.lines)
 
     setTabStops(result)
 
-    p("result.inputLines",result.inputLines)
     for x in range(0,len(result.inputLines[lineNo])):
-        p("x",x)
         result.inputX = x
         processChar(result, result.inputLines[lineNo][x])
-    p("result.lines",result.lines)
-    p("result.inputLines",result.inputLines)
     processChar(result, NEWLINE)
 
     if not result.forceBalance:
-        p("if not result.forceBalance:")
         checkUnmatchedOutsideParenTrail(result)
         checkLeadingCloseParen(result)
 
@@ -1443,7 +1341,6 @@ def processLine(result, lineNo):
         finishNewParenTrail(result)
 
 def finalizeResult(result):
-    p("finalizeResult")
     if result.quoteDanger:
         raise error(result, ERROR_QUOTE_DANGER)
     if result.isInStr:
@@ -1460,7 +1357,6 @@ def finalizeResult(result):
     result.success = True
 
 def processError(result, e):
-    p("processError")
     result.success = False
     if 'parinferError' in e:
         del e['parinferError']
@@ -1471,9 +1367,7 @@ def processError(result, e):
         raise e
 
 def processText(text, options, mode, smart=False):
-    p("processText")
     result = getInitialResult(text, options, mode, smart)
-    p(result)
     try:
         for i in range(len(result.inputLines)):
             result.inputLineNo = i
@@ -1483,7 +1377,6 @@ def processText(text, options, mode, smart=False):
         errorDetails = e.args[0]
         if 'leadingCloseParen' in errorDetails or 'releaseCursorHold' in errorDetails:
             assert mode != PAREN_MODE
-            p("re-processText")
             return processText(text, options, PAREN_MODE, smart)
         processError(result, errorDetails)
 
@@ -1494,7 +1387,6 @@ def processText(text, options, mode, smart=False):
 #-------------------------------------------------------------------------------
 
 def publicResult(result):
-    p("publicResult")
     lineEnding = getLineEnding(result.origText)
     if result.success:
         final = {
@@ -1528,17 +1420,12 @@ def publicResult(result):
     return final
 
 def indent_mode(text, options):
-    p("indent_mode")
-    p("indent_mode on:",text)
     return publicResult(processText(text, options, INDENT_MODE))
 
 def paren_mode(text, options):
-    p("paren_mode")
-    p("paren_mode on:",text)
     return publicResult(processText(text, options, PAREN_MODE))
 
 def smart_mode(text, options):
-    p("smart_mode")
     smart = False
     if isinstance(options, dict):
         smart = 'selectionStartLine' not in options or options['selectionStartLine'] is None
