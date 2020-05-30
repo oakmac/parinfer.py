@@ -617,16 +617,15 @@ def onOpenParen(result):
         result.parenStack.append(opener)
         result.trackingArgTabStop = 'space'
 
-# def setCloser(opener, lineNo, x, ch):
-#     # TODO: This code won't run.
-#     opener.closer.lineNo = lineNo
-#     opener.closer.x = x
-#     opener.closer.ch = ch
+def setCloser(opener, lineNo, x, ch):
+    opener.closer['lineNo'] = lineNo
+    opener.closer['x'] = x
+    opener.closer['ch'] = ch
 
 def onMatchedCloseParen(result):
     opener = peek(result.parenStack, 0)
-    # if result.returnParens:
-    #     setCloser(opener, result.lineNo, result.x, result.ch)
+    if result.returnParens:
+        setCloser(opener, result.lineNo, result.x, result.ch)
 
     result.parenTrail.endX = result.x + 1
     result.parenTrail.openers.append(opener)
@@ -1034,8 +1033,8 @@ def correctParenTrail(result, indentX):
         closeCh = MATCH_PAREN[opener.ch]
         parens += closeCh
 
-        # if result.returnParens:
-        #     setCloser(opener, result.parenTrail.lineNo, result.parenTrail.startX+i, closeCh)
+        if result.returnParens:
+            setCloser(opener, result.parenTrail.lineNo, result.parenTrail.startX+i, closeCh)
 
     if result.parenTrail.lineNo is not None:
         replaceWithinLine(result, result.parenTrail.lineNo, result.parenTrail.startX, result.parenTrail.endX, parens)
@@ -1068,8 +1067,8 @@ def cleanParenTrail(result):
 def appendParenTrail(result):
     opener = result.parenStack.pop()
     closeCh = MATCH_PAREN[opener.ch]
-    # if result.returnParens:
-    #     setCloser(opener, result.parenTrail.lineNo, result.parenTrail.endX, closeCh)
+    if result.returnParens:
+        setCloser(opener, result.parenTrail.lineNo, result.parenTrail.endX, closeCh)
 
     setMaxIndent(result, opener)
     insertWithinLine(result, result.parenTrail.lineNo, result.parenTrail.endX, closeCh)
@@ -1111,7 +1110,7 @@ def rememberParenTrail(result):
 
         if result.returnParens:
             for i in range(len(openers)):
-                openers[i].closer.trail = shortTrail
+                openers[i].closer['trail'] = shortTrail
 
 def updateRememberedParenTrail(result):
     if result.parenTrails:
@@ -1122,7 +1121,7 @@ def updateRememberedParenTrail(result):
             trail['endX'] = result.parenTrail.endX
             if result.returnParens:
                 opener = result.parenTrail.openers[-1]
-                opener.closer.trail = trail
+                opener.closer['trail'] = trail
     else:
         rememberParenTrail(result)
 
@@ -1382,7 +1381,7 @@ def publicResult(result):
             'parenTrails': result.parenTrails
         }
         if result.returnParens:
-            final.parens = result.parens
+            final['parens'] = result.parens
     else:
         final = {
             'text': lineEnding.join(result.lines) if result.partialResult else result.origText,
@@ -1393,7 +1392,7 @@ def publicResult(result):
             'error': result.error
         }
         if result.partialResult and result.returnParens:
-            final.parens = result.parens
+            final['parens'] = result.parens
 
     if final['cursorX'] is None:
         del final['cursorX']

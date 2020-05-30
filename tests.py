@@ -69,6 +69,11 @@ class TestParinfer(unittest.TestCase):
         if isinstance(case['options'], dict) and 'options' in case:
             options = case['options']
 
+        # We are not yet verifying that the returned paren tree is correct.
+        # We are simply setting it to ensure it is constructed in a way that doesn't
+        # throw an exception.
+        options['returnParens'] = True
+
         with self.subTest(test_id):
             actual = modeFn[mode](text, options)
             self.assertStructure(actual, expected)
