@@ -1,3 +1,10 @@
+## 3.12.0 - 2020-05-29
+* Direct update from reference implementation - [parinfer.js].
+* Python-specific performance improvements.
+* Update tests to use unittest instead of separate package.
+* About 30% to 50% slower than 0.7.0.
+* Requires Python 3.
+
 ## 0.7.0 - 2016-02-03
 * Performance improvements
 
