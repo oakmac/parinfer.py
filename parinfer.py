@@ -16,8 +16,6 @@ import sys
 # Constants
 #-------------------------------------------------------------------------------
 
-# None = -999
-
 INDENT_MODE = 'INDENT_MODE'
 PAREN_MODE = 'PAREN_MODE'
 
@@ -203,14 +201,15 @@ class Result:
                 'errorPosCache: ' + str(self.errorPosCache) + '\n\t}')
 
     def __init__(self, text, options, mode, smart):
+        """Constructs a dictionary of the initial state."""
         super(Result, self).__init__()
 
         self.mode = mode                # [enum] - current processing mode (INDENT_MODE or PAREN_MODE)
         self.smart = smart              # [boolean] - smart mode attempts special user-friendly behavior
 
         self.origText = text            # [string] - original text
-        self.origCursorX = None    # [integer] - original cursorX option
-        self.origCursorLine = None # [integer] - original cursorLine option
+        self.origCursorX = None         # [integer] - original cursorX option
+        self.origCursorLine = None      # [integer] - original cursorLine option
 
                                         # [string array] - input lines that we process line-by-line char-by-char
         self.inputLines = re.split(LINE_ENDING_REGEX, text)
@@ -222,7 +221,7 @@ class Result:
         self.lineNo = -1                # [integer] - output line number we are on
         self.ch = ''                    # [string] - character we are processing (can be changed to indicate a replacement)
         self.x = 0                      # [integer] - output x position of the current character (ch)
-        self.indentX = None        # [integer] - x position of the indentation point if present
+        self.indentX = None             # [integer] - x position of the indentation point if present
 
         self.parenStack = []            # We track where we are in the Lisp tree by keeping a stack (array) of open-parens.
                                         # Stack elements are objects containing keys {ch, x, lineNo, indentDelta}
@@ -239,12 +238,12 @@ class Result:
         self.returnParens = False       # [boolean] - determines if we return `parens` described below
         self.parens = []                # [array of {lineNo, x, closer, children}] - paren tree if `returnParens` is h
 
-        self.cursorX = None        # [integer] - x position of the cursor
-        self.cursorLine = None     # [integer] - line number of the cursor
-        self.prevCursorX = None    # [integer] - x position of the previous cursor
-        self.prevCursorLine = None # [integer] - line number of the previous cursor
+        self.cursorX = None             # [integer] - x position of the cursor
+        self.cursorLine = None          # [integer] - line number of the cursor
+        self.prevCursorX = None         # [integer] - x position of the previous cursor
+        self.prevCursorLine = None      # [integer] - line number of the previous cursor
 
-        self.selectionStartLine = None # [integer] - line number of the current selection starting point
+        self.selectionStartLine = None  # [integer] - line number of the current selection starting point
 
         self.changes = None             # [object] - mapping change.key to a change object (please see `transformChange` for object structure)
 
@@ -253,7 +252,7 @@ class Result:
         self.isEscaped = False          # [boolean] - indicates if the current character is escaped (e.g. `\c`).  This may be inside string comment or code.
         self.isInStr = False            # [boolean] - indicates if we are currently inside a string
         self.isInComment = False        # [boolean] - indicates if we are currently inside a comment
-        self.commentX = None       # [integer] - x position of the start of comment on current line (if any)
+        self.commentX = None            # [integer] - x position of the start of comment on current line (if any)
 
         self.quoteDanger = False        # [boolean] - indicates if quotes are imbalanced inside of a comment (dangerous)
         self.trackingIndent = False     # [boolean] - are we looking for the indentation point of the current line?
@@ -298,7 +297,7 @@ class Result:
                 self.origCursorX = options['cursorX']
             if 'cursorLine' in options:
                 self.cursorLine = options['cursorLine']
-                self.origCursorLine     = options['cursorLine']
+                self.origCursorLine = options['cursorLine']
             if 'prevCursorX' in options:
                 self.prevCursorX = options['prevCursorX']
             if 'prevCursorLine' in options:
@@ -313,18 +312,6 @@ class Result:
                 self.forceBalance = options['forceBalance']
             if 'returnParens' in options:
                 self.returnParens = options['returnParens']
-
-    # def isClosable(self):
-    #     ch = self.ch
-    #     closer = ch in CLOSE_PARENS and not self.isEscaped
-    #     # closer = ch in ('}', ')', ']') and not result.isEscaped
-    #     return self.isInCode and not isWhitespace(self) and ch != '' and not closer
-    #     # return result.isInCode and not ch in (BLANK_SPACE, DOUBLE_SPACE) and ch != '' and not closer
-
-def getInitialResult(text, options, mode, smart):
-    """Returns a dictionary of the initial state."""
-
-    return Result(text, options, mode, smart)
 
 #-------------------------------------------------------------------------------
 # Possible Errors
@@ -417,16 +404,6 @@ if RUN_ASSERTS:
     assert replaceWithinString('aaa', 0, 2, '') == 'a'
     assert replaceWithinString('aaa', 0, 1, 'b') == 'baa'
     assert replaceWithinString('aaa', 0, 2, 'b') == 'ba'
-
-def repeatString(text, n):
-    return text*n
-
-if RUN_ASSERTS:
-    assert repeatString('a', 2) == 'aa'
-    assert repeatString('aa', 3) == 'aaaaaa'
-    assert repeatString('aa', 0) == ''
-    assert repeatString('', 0) == ''
-    assert repeatString('', 5) == ''
 
 def getLineEnding(text):
     # NOTE: We assume that if the CR char "\r" is used anywhere,
@@ -543,7 +520,6 @@ def isClosable(result):
     return result.isInCode and not isWhitespace(result) and ch != '' and not closer
     # return result.isInCode and not ch in (BLANK_SPACE, DOUBLE_SPACE) and ch != '' and not closer
 
-
 #-------------------------------------------------------------------------------
 # Advanced operations on characters
 #-------------------------------------------------------------------------------
@@ -583,7 +559,8 @@ def trackArgTabStop(result, state):
 #-------------------------------------------------------------------------------
 
 class Opener(object):
-    __slots__ = ('self', 'inputLineNo', 'inputX', 'lineNo', 'x', 'ch', 'indentDelta', 'maxChildIndent', 'argX', 'children', 'closer')
+    __slots__ = ('self', 'inputLineNo', 'inputX', 'lineNo', 'x', 'ch', 'indentDelta', 
+                 'maxChildIndent', 'argX', 'children', 'closer')
     def __init__(self, inputLineNo, inputX, lineNo, x, ch, indentDelta, maxChildIndent):
         super(Opener, self).__init__()
         self.inputLineNo = inputLineNo
@@ -606,17 +583,6 @@ class Opener(object):
                 + "\n  indentDelta: " + str(self.indentDelta)
                 + "\n  maxChildIndent: " + str(self.maxChildIndent)
                 + "}")
-
-        # opener = {
-        #     'inputLineNo': result.inputLineNo,
-        #     'inputX': result.inputX,
-
-        #     'lineNo': result.lineNo,
-        #     'x': result.x,
-        #     'ch': result.ch,
-        #     'indentDelta': result.indentDelta,
-        #     'maxChildIndent': None
-        # }
 
 def onOpenParen(result):
     if result.isInCode:
@@ -1171,7 +1137,7 @@ def finishNewParenTrail(result):
 def addIndent(result, delta):
     origIndent = result.x
     newIndent = origIndent + delta
-    indentStr = repeatString(BLANK_SPACE, newIndent)
+    indentStr = BLANK_SPACE*newIndent
     replaceWithinLine(result, result.lineNo, 0, origIndent, indentStr)
     result.x = newIndent
     result.indentX = newIndent
@@ -1377,7 +1343,7 @@ def processError(result, e):
         raise e
 
 def processText(text, options, mode, smart=False):
-    result = getInitialResult(text, options, mode, smart)
+    result = Result(text, options, mode, smart)
     try:
         for i in range(len(result.inputLines)):
             result.inputLineNo = i
