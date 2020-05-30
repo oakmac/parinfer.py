@@ -617,15 +617,16 @@ def onOpenParen(result):
         result.parenStack.append(opener)
         result.trackingArgTabStop = 'space'
 
-def setCloser(opener, lineNo, x, ch):
-    opener.closer.lineNo = lineNo
-    opener.closer.x = x
-    opener.closer.ch = ch
+# def setCloser(opener, lineNo, x, ch):
+#     # TODO: This code won't run.
+#     opener.closer.lineNo = lineNo
+#     opener.closer.x = x
+#     opener.closer.ch = ch
 
 def onMatchedCloseParen(result):
     opener = peek(result.parenStack, 0)
-    if result.returnParens:
-        setCloser(opener, result.lineNo, result.x, result.ch)
+    # if result.returnParens:
+    #     setCloser(opener, result.lineNo, result.x, result.ch)
 
     result.parenTrail.endX = result.x + 1
     result.parenTrail.openers.append(opener)
@@ -1033,8 +1034,8 @@ def correctParenTrail(result, indentX):
         closeCh = MATCH_PAREN[opener.ch]
         parens += closeCh
 
-        if result.returnParens:
-            setCloser(opener, result.parenTrail.lineNo, result.parenTrail.startX+i, closeCh)
+        # if result.returnParens:
+        #     setCloser(opener, result.parenTrail.lineNo, result.parenTrail.startX+i, closeCh)
 
     if result.parenTrail.lineNo is not None:
         replaceWithinLine(result, result.parenTrail.lineNo, result.parenTrail.startX, result.parenTrail.endX, parens)
@@ -1067,8 +1068,8 @@ def cleanParenTrail(result):
 def appendParenTrail(result):
     opener = result.parenStack.pop()
     closeCh = MATCH_PAREN[opener.ch]
-    if result.returnParens:
-        setCloser(opener, result.parenTrail.lineNo, result.parenTrail.endX, closeCh)
+    # if result.returnParens:
+    #     setCloser(opener, result.parenTrail.lineNo, result.parenTrail.endX, closeCh)
 
     setMaxIndent(result, opener)
     insertWithinLine(result, result.parenTrail.lineNo, result.parenTrail.endX, closeCh)
