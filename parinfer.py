@@ -429,7 +429,7 @@ def shiftCursorOnEdit(result, lineNo, start, end, replace):
 
     if (dx != 0 and
             result.cursorLine == lineNo and
-            result.cursorX != None and
+            result.cursorX is not None and
             isCursorAffected(result, start, end)):
         result.cursorX += dx
 
@@ -497,12 +497,12 @@ def peek(arr, idxFromBack):
 
 if RUN_ASSERTS:
     assert peek(['a'], 0) == 'a'
-    assert peek(['a'], 1) == None
+    assert peek(['a'], 1) is None
     assert peek(['a', 'b', 'c'], 0) == 'c'
     assert peek(['a', 'b', 'c'], 1) == 'b'
-    assert peek(['a', 'b', 'c'], 5) == None
-    assert peek([], 0) == None
-    assert peek([], 1) == None
+    assert peek(['a', 'b', 'c'], 5) is None
+    assert peek([], 0) is None
+    assert peek([], 1) is None
 
 #-------------------------------------------------------------------------------
 # Questions about characters
@@ -539,7 +539,7 @@ def checkCursorHolding(result):
         result.cursorLine == opener.lineNo and
         holdMinX <= result.cursorX and result.cursorX <= holdMaxX
     )
-    shouldCheckPrev = not result.changes and result.prevCursorLine != None
+    shouldCheckPrev = not result.changes and result.prevCursorLine is not None
     if shouldCheckPrev:
         prevHolding = (
             result.prevCursorLine == opener.lineNo and
@@ -758,16 +758,16 @@ def onChar(result):
 def isCursorLeftOf(cursorX, cursorLine, x, lineNo):
     return (
         cursorLine == lineNo and
-        x != None and
-        cursorX != None and
+        x is not None and
+        cursorX is not None and
         cursorX <= x # inclusive since (cursorX = x) implies (x-1 < cursor < x)
     )
 
 def isCursorRightOf(cursorX, cursorLine, x, lineNo):
     return (
         cursorLine == lineNo and
-        x != None and
-        cursorX != None and
+        x is not None and
+        cursorX is not None and
         cursorX > x
     )
 
@@ -1036,7 +1036,7 @@ def correctParenTrail(result, indentX):
         if result.returnParens:
             setCloser(opener, result.parenTrail.lineNo, result.parenTrail.startX+i, closeCh)
 
-    if result.parenTrail.lineNo != None:
+    if result.parenTrail.lineNo is not None:
         replaceWithinLine(result, result.parenTrail.lineNo, result.parenTrail.startX, result.parenTrail.endX, parens)
         result.parenTrail.endX = result.parenTrail.startX + len(parens)
         rememberParenTrail(result)
@@ -1099,7 +1099,7 @@ def rememberParenTrail(result):
     trail = result.parenTrail
     openers = trail.clamped.openers + trail.openers
     if len(openers) > 0:
-        isClamped = trail.clamped.startX != None
+        isClamped = trail.clamped.startX is not None
         allClamped = len(trail.openers) == 0
         shortTrail = {
             'lineNo': trail.lineNo,
@@ -1254,12 +1254,12 @@ def makeTabStop(result, opener):
         'x': opener.x,
         'lineNo': opener.lineNo
     }
-    if opener.argX != None:
+    if opener.argX is not None:
         tabStop['argX'] = opener.argX
     return tabStop
 
 def getTabStopLine(result):
-    return result.selectionStartLine if result.selectionStartLine != None else result.cursorLine
+    return result.selectionStartLine if result.selectionStartLine is not None else result.cursorLine
 
 def setTabStops(result):
     if getTabStopLine(result) != result.lineNo:
@@ -1394,9 +1394,9 @@ def publicResult(result):
         if result.partialResult and result.returnParens:
             final.parens = result.parens
 
-    if final['cursorX'] == None:
+    if final['cursorX'] is None:
         del final['cursorX']
-    if final['cursorLine'] == None:
+    if final['cursorLine'] is None:
         del final['cursorLine']
     if 'tabStops' in final and len(final['tabStops']) == 0:
         del final['tabStops']
