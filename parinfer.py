@@ -69,8 +69,8 @@ def transformChange(change):
     #      |[])
     #    ++^ newEndX, newEndLineNo
 
-    lastOldLineLen = len(oldLines[len(oldLines)-1])
-    lastNewLineLen = len(newLines[len(newLines)-1])
+    lastOldLineLen = len(oldLines[-1])
+    lastNewLineLen = len(newLines[-1])
 
     oldEndX = (change['x'] if len(oldLines) == 1 else 0) + lastOldLineLen
     newEndX = (change['x'] if len(newLines) == 1 else 0) + lastNewLineLen
@@ -486,10 +486,14 @@ def clamp(val, minN, maxN):
 #     assert clamp(1, None, None) == 1
 
 def peek(arr, idxFromBack):
-    maxIdx = len(arr) - 1
-    if idxFromBack > maxIdx:
+    # maxIdx = len(arr) - 1
+    # if idxFromBack > maxIdx:
+    #     return None
+    # return arr[maxIdx - idxFromBack]
+    try:
+        return arr[-1 - idxFromBack]
+    except IndexError:
         return None
-    return arr[maxIdx - idxFromBack]
 
 if RUN_ASSERTS:
     assert peek(['a'], 0) == 'a'
@@ -509,15 +513,16 @@ def isValidCloseParen(parenStack, ch):
         return False
     return peek(parenStack, 0).ch == MATCH_PAREN[ch]
 
-def isWhitespace(result):
-    return not result.isEscaped and result.ch in WHITESPACE
+# def isWhitespace(result):
+#     return not result.isEscaped and result.ch in WHITESPACE
 
 # can this be the last code character of a list?
 def isClosable(result):
     ch = result.ch
     closer = ch in CLOSE_PARENS and not result.isEscaped
     # closer = ch in ('}', ')', ']') and not result.isEscaped
-    return result.isInCode and not isWhitespace(result) and ch != '' and not closer
+    # return result.isInCode and not isWhitespace(result) and ch != '' and not closer
+    return result.isInCode and (result.isEscaped or ch not in WHITESPACE) and ch != '' and not closer
     # return result.isInCode and not ch in (BLANK_SPACE, DOUBLE_SPACE) and ch != '' and not closer
 
 #-------------------------------------------------------------------------------
@@ -546,10 +551,12 @@ def checkCursorHolding(result):
 
 def trackArgTabStop(result, state):
     if state == 'space':
-        if result.isInCode and isWhitespace(result):
+        # if result.isInCode and isWhitespace(result):
+        if result.isInCode and not result.isEscaped and result.ch in WHITESPACE:
             result.trackingArgTabStop = 'arg'
     elif state == 'arg':
-        if not isWhitespace(result):
+        # if not isWhitespace(result):
+        if result.isEscaped or result.ch not in WHITESPACE:
             opener = peek(result.parenStack, 0)
             opener.argX = result.x
             result.trackingArgTabStop = None
@@ -1107,13 +1114,13 @@ def rememberParenTrail(result):
 
 def updateRememberedParenTrail(result):
     if result.parenTrails:
-        trail = result.parenTrails[len(result.parenTrails)-1]
+        trail = result.parenTrails[-1]
         if trail['lineNo'] != result.parenTrail.lineNo:
             rememberParenTrail(result)
         else:
             trail['endX'] = result.parenTrail.endX
             if result.returnParens:
-                opener = result.parenTrail.openers[len(result.parenTrail.openers)-1]
+                opener = result.parenTrail.openers[-1]
                 opener.closer.trail = trail
     else:
         rememberParenTrail(result)
