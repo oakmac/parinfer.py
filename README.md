@@ -19,7 +19,6 @@ improvement in this implementation. PR's welcome :)
 ## Run Tests
 
 ```sh
-sudo pip install unittest2
 python tests.py
 ```
 
@@ -27,6 +26,12 @@ To run a performance stress test:
 
 ```
 python perf.py
+```
+
+To profile those performance stress tests:
+
+```
+python -m cProfile -s time perf.py
 ```
 
 ## License
