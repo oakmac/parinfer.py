@@ -1292,5 +1292,22 @@
       ],
       "out": "(defn foo\n  \"hello, this is a docstring\"\n  [a b]\n      ^ parenTrail\n  (let [sum (+ a b)\n                  ^ parenTrail\n        prod (* a b)]\n                   ^^ parenTrail\n     {:sum sum\n      :prod prod}))\n                ^^^ parenTrail"
     }
+  },
+  {
+    "text": "(def foo \\,\n(def bar \\ - <-- space",
+    "options": {
+      "comment": "-"
+    },
+    "result": {
+      "text": "(def foo \\,)\n(def bar \\ )- <-- space",
+      "success": true
+    },
+    "source": {
+      "lineNo": 356,
+      "in": [
+        "(def foo \\,\n(def bar \\ - <-- space"
+      ],
+      "out": "(def foo \\,)\n(def bar \\ )- <-- space"
+    }
   }
 ]
