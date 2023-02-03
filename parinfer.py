@@ -141,24 +141,18 @@ def getLineEnding(text):
         return "\r\n"
     return "\n"
 
-
-
-
 #-------------------------------------------------------------------------------
 # Stack Operations
 
 def isStackEmpty(s):
-    return strLen(s) == 0
+    return arraySize(s) == 0
 
 def peek(arr, idxFromBack):
-    # maxIdx = len(arr) - 1
-    # if idxFromBack > maxIdx:
-    #     return None
-    # return arr[maxIdx - idxFromBack]
-    try:
-        return arr[-1 - idxFromBack]
-    except IndexError:
+    maxIdx = arraySize(arr) - 1
+    if idxFromBack > maxIdx:
         return None
+    else:
+        return arr[maxIdx - idxFromBack]
 
 if RUN_ASSERTS:
     assert peek(['a'], 0) == 'a'
@@ -240,12 +234,23 @@ def transformChange(change):
     #      |[])
     #    ++^ newEndX, newEndLineNo
 
-    lastOldLineLen = len(oldLines[-1])
-    lastNewLineLen = len(newLines[-1])
+    prevOldLine = peek(oldLines, 0)
+    lastOldLineLen = strLen(prevOldLine)
 
-    oldEndX = (change['x'] if len(oldLines) == 1 else 0) + lastOldLineLen
-    newEndX = (change['x'] if len(newLines) == 1 else 0) + lastNewLineLen
-    newEndLineNo = change['lineNo'] + (len(newLines)-1)
+    prevNewLine = peek(newLines, 0)
+    lastNewLineLen = strLen(prevNewLine)
+
+    carryOverOldX = 0
+    if arraySize(oldLines) == 1:
+        carryOverOldX = change['x']
+    oldEndX = carryOverOldX + lastOldLineLen
+
+    carryOverNewX = 0
+    if arraySize(newLines) == 1:
+        carryOverNewX = change['x']
+    newEndX = carryOverNewX + lastNewLineLen
+
+    newEndLineNo = change['lineNo'] + arraySize(newLines) - 1
 
     return {
         'x': change['x'],
@@ -262,25 +267,29 @@ def transformChange(change):
     }
 
 def transformChanges(changes):
-    if len(changes) == 0:
+    if arraySize(changes) == 0:
         return None
-
-    lines = {}
-    for change in changes:
-        change = transformChange(change)
-        # print("change:",change['lookupLineNo'])
-        if change['lookupLineNo'] not in lines:
-            line = lines[change['lookupLineNo']] = {}
-        else:
+    else:
+        lines = {}
+        changesLen = arraySize(changes)
+        i = 0
+        while i < changesLen:
+            change = transformChange(changes[i])
             line = lines[change['lookupLineNo']]
+            if not line:
+                line = {}
+                lines[change['lookupLineNo']] = line
+            line[change['lookupX']] = change
 
-        line[change['lookupX']] = change
+            i = i + 1
+        return lines
 
-    return lines
+def parseOptions(options):
+    # FIXME: write me
+    return options
 
 #-------------------------------------------------------------------------------
 # Result Structure
-#-------------------------------------------------------------------------------
 
 # This represents the running result. As we scan through each character
 # of a given text, we mutate this structure to update the state of our
