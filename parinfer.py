@@ -5,7 +5,7 @@
 ## More information about Parinfer can be found here:
 ## http://shaunlebron.github.io/parinfer/
 ##
-## Copyright (c) 2015, 2020, Chris Oakman and other contributors
+## Copyright (c) 2015 Chris Oakman and other contributors
 ## Released under the ISC license
 ## https://github.com/oakmac/parinfer.py/blob/master/LICENSE.md
 
@@ -14,7 +14,8 @@ import sys
 
 #-------------------------------------------------------------------------------
 # Constants
-#-------------------------------------------------------------------------------
+
+UINT_NULL = -999
 
 INDENT_MODE = 'INDENT_MODE'
 PAREN_MODE = 'PAREN_MODE'
@@ -42,11 +43,182 @@ MATCH_PAREN = {
 }
 
 # toggle this to check the asserts during development
-RUN_ASSERTS = False
+RUN_ASSERTS = True
+
+def isBoolean(x):
+    return x == True or x == False
+
+def isArray(x):
+    ## FIXME
+    return None
+
+def isInteger(x):
+    ## FIXME
+    return None
+
+def isPositiveInt(i):
+    ## FIXME
+    return None
+
+def isString(s):
+    ## FIXME
+    return None
+
+def isChar(c):
+    ## FIXME
+    return None
+
+def isArrayOfChars(arr):
+    ## FIXME
+    return None    
+
+#-------------------------------------------------------------------------------
+# Language Helpers
+
+def arraySize(a):
+    return len(a)
+
+def strLen(s):
+    return len(s)
+
+def strConcat(s1, s2):
+    return s1 + s2
+
+def getCharFromString(s, idx):
+    return s[idx]
+
+def indexOf(arr, val):
+    lngth = arraySize(arr)
+    i = 0
+    while i < lngth:
+        if val == arr[i]:
+            return i
+        i = i + 1
+    return -1
+
+if RUN_ASSERTS:
+    assert indexOf(['a','b','c'], 'a') == 0
+    assert indexOf(['a','b','c'], 'b') == 1
+    assert indexOf(['a','b','c'], 'c') == 2
+    assert indexOf(['a','b','c'], 'd') == -1
+
+#-------------------------------------------------------------------------------
+# String Operations
+
+def replaceWithinString(orig, startIdx, endIdx, replace):
+    head = orig[0:startIdx]
+    origLength = strLen(orig)
+    tail = orig[endIdx:origLength]
+    s1 = strConcat(head, replace)
+    return strConcat(s1, tail)
+
+if RUN_ASSERTS:
+    assert replaceWithinString('abc', 0, 2, '') == 'c'
+    assert replaceWithinString('abc', 0, 1, 'x') == 'xbc'
+    assert replaceWithinString('abc', 0, 2, 'x') == 'xc'
+    assert replaceWithinString('abcdef', 3, 25, '') == 'abc'
+
+def repeatString(text, n):
+    result = ''
+    i = 0
+    while i < n:
+        result = result + text
+        i = i + 1
+    return result
+
+if RUN_ASSERTS:
+    assert repeatString('a', 2) == 'aa'
+    assert repeatString('aa', 3) == 'aaaaaa'
+    assert repeatString('aa', 0) == ''
+    assert repeatString('', 0) == ''
+    assert repeatString('', 5) == ''
+
+def getLineEnding(text):
+    # NOTE: We assume that if the CR char "\r" is used anywhere,
+    #       then we should use CRLF line-endings after every line.
+    i = text.find("\r")
+    if i != -1:
+        return "\r\n"
+    return "\n"
+
+
+
+
+#-------------------------------------------------------------------------------
+# Stack Operations
+
+def isStackEmpty(s):
+    return strLen(s) == 0
+
+def peek(arr, idxFromBack):
+    # maxIdx = len(arr) - 1
+    # if idxFromBack > maxIdx:
+    #     return None
+    # return arr[maxIdx - idxFromBack]
+    try:
+        return arr[-1 - idxFromBack]
+    except IndexError:
+        return None
+
+if RUN_ASSERTS:
+    assert peek(['a'], 0) == 'a'
+    assert peek(['a'], 1) is None
+    assert peek(['a', 'b', 'c'], 0) == 'c'
+    assert peek(['a', 'b', 'c'], 1) == 'b'
+    assert peek(['a', 'b', 'c'], 5) is None
+    assert peek([], 0) is None
+    assert peek([], 1) is None
+
+def stackPop(s):
+    if arraySize(s) == 0:
+        return None
+    else:
+        itm = s.pop()
+        return itm
+
+if RUN_ASSERTS:
+    assert stackPop(['a']) == 'a'
+    assert stackPop(['a', 'b', 'c']) == 'c'
+
+    testArray1 = ['a', 'b']
+    assert stackPop(testArray1) == 'b'
+    assert arraySize(testArray1) == 1
+    assert stackPop(testArray1) == 'a'
+    assert arraySize(testArray1) == 0
+    stackPop(testArray1)
+    assert arraySize(testArray1) == 0
+
+def stackPush(s, itm):
+    s.append(itm)
+    return None
+
+if RUN_ASSERTS:
+    testArray2 = ['a', 'b']
+    stackPush(testArray2, 'c')
+    assert arraySize(testArray2) == 3
+    assert peek(testArray2, 0) == 'c'
+    assert peek(testArray2, 1) == 'b'
+
+def arraySlice(arr, fromIdx, toIdx):
+    newArray = []
+    arrLen = arraySize(arr)
+    i = fromIdx
+    while i < toIdx and i < arrLen:
+        itm = arr[i]
+        stackPush(newArray, itm)
+        i = i + 1
+    return newArray
+
+if RUN_ASSERTS:
+    assert arraySlice(['a', 'b', 'c'], 0, 1) == ['a']
+    assert arraySlice(['a', 'b', 'c'], 0, 1) == ['a']
+    assert arraySlice(['a', 'b', 'c'], 1, 2) == ['b']
+    assert arraySlice(['a', 'b', 'c', 'd', 'e'], 1, 3) == ['b', 'c']
+    assert arraySlice(['a', 'b', 'c', 'd', 'e'], 2, 25) == ['c', 'd', 'e']
+    assert arraySlice([], 2, 3) == []
 
 #-------------------------------------------------------------------------------
 # Options Structure
-#-------------------------------------------------------------------------------
 
 def transformChange(change):
     if not change:
@@ -397,25 +569,7 @@ def error(result, name):
 
     return ParinferError(e)
 
-#-------------------------------------------------------------------------------
-# String Operations
-#-------------------------------------------------------------------------------
 
-def replaceWithinString(orig, start, end, replace):
-    return orig[:start] + replace + orig[end:]
-
-if RUN_ASSERTS:
-    assert replaceWithinString('aaa', 0, 2, '') == 'a'
-    assert replaceWithinString('aaa', 0, 1, 'b') == 'baa'
-    assert replaceWithinString('aaa', 0, 2, 'b') == 'ba'
-
-def getLineEnding(text):
-    # NOTE: We assume that if the CR char "\r" is used anywhere,
-    #       then we should use CRLF line-endings after every line.
-    i = text.find("\r")
-    if i != -1:
-        return "\r\n"
-    return "\n"
 
 #-------------------------------------------------------------------------------
 # Line Operations
@@ -489,24 +643,7 @@ def clamp(val, minN, maxN):
 #     assert clamp(9, None, 5) == 5
 #     assert clamp(1, None, None) == 1
 
-def peek(arr, idxFromBack):
-    # maxIdx = len(arr) - 1
-    # if idxFromBack > maxIdx:
-    #     return None
-    # return arr[maxIdx - idxFromBack]
-    try:
-        return arr[-1 - idxFromBack]
-    except IndexError:
-        return None
 
-if RUN_ASSERTS:
-    assert peek(['a'], 0) == 'a'
-    assert peek(['a'], 1) is None
-    assert peek(['a', 'b', 'c'], 0) == 'c'
-    assert peek(['a', 'b', 'c'], 1) == 'b'
-    assert peek(['a', 'b', 'c'], 5) is None
-    assert peek([], 0) is None
-    assert peek([], 1) is None
 
 #-------------------------------------------------------------------------------
 # Questions about characters
