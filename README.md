@@ -13,33 +13,29 @@ This is basically a 1-to-1 copy of [parinfer.js].
 The `.json` files in the [tests] folder are copied directly from the [main
 Parinfer repo].
 
-I am a very novice Python developer. There is likely lots of room for
-improvement in this implementation. PR's welcome :)
-
 ## Run Tests
 
 ```sh
-python tests.py
+python3 tests.py
 ```
 
 To run a performance stress test:
 
 ```
-python perf.py
+python3 perf.py
 ```
 
 To profile those performance stress tests:
 
 ```
-python -m cProfile -s time perf.py
+python3 -m cProfile -s time perf.py
 ```
 
 ## License
 
-[ISC license]
+[ISC license](LICENSE.md)
 
 [Parinfer]:http://shaunlebron.github.io/parinfer/
-[parinfer.js]:https://github.com/shaunlebron/parinfer/blob/master/lib/parinfer.js
+[parinfer.js]:https://github.com/parinfer/parinfer.js
 [tests]:tests/
-[main Parinfer repo]:https://github.com/shaunlebron/parinfer/tree/master/lib/test/cases
-[ISC License]:LICENSE.md
+[main Parinfer repo]:https://github.com/parinfer/parinfer.js/tree/master/test/cases
